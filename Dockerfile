@@ -24,6 +24,10 @@ RUN go build -o finex-daemon ./cmd/finex-daemon/main.go
 FROM alpine:3.9
 
 RUN apk add ca-certificates
-WORKDIR app
+WORKDIR /app
+
+COPY --from=builder /build/config ./config
 COPY --from=builder /build/finex-api ./
+COPY --from=builder /build/finex-engine ./
+COPY --from=builder /build/finex-daemon ./
 COPY --from=builder /usr/bin/kaigara /usr/bin/kaigara

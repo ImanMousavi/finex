@@ -4,10 +4,10 @@ import (
 	"encoding/json"
 	"log"
 
-	"gitlab.com/zsmartex/finex/config"
-	"gitlab.com/zsmartex/finex/models"
-	"gitlab.com/zsmartex/finex/services/depth_service"
-	"gitlab.com/zsmartex/finex/types"
+	"github.com/zsmartex/go-finex/config"
+	"github.com/zsmartex/go-finex/models"
+	"github.com/zsmartex/go-finex/services/depth_service"
+	"github.com/zsmartex/go-finex/types"
 )
 
 type DepthWorker struct {

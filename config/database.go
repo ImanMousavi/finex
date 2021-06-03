@@ -11,10 +11,10 @@ var DataBase *gorm.DB
 
 func ConnectDatabase() error {
 	dsn := "host=" + os.Getenv("DATABASE_HOST") +
+		" port=" + os.Getenv("DATABASE_PORT") +
 		" user=" + os.Getenv("DATABASE_USER") +
 		" password=" + os.Getenv("DATABASE_PASS") +
 		" dbname=" + os.Getenv("DATABASE_NAME") +
-		" port=" + os.Getenv("DATABASE_PORT") +
 		" sslmode=disable"
 	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{
 		SkipDefaultTransaction: true,

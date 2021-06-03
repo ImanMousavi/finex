@@ -2,7 +2,7 @@ package routes
 
 import (
 	"github.com/gofiber/fiber/v2"
-	"gitlab.com/zsmartex/finex/controllers"
+	"github.com/zsmartex/go-finex/controllers"
 )
 
 func SetupRouter() *fiber.App {

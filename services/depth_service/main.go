@@ -1,9 +1,9 @@
 package depth_service
 
 import (
-	"gitlab.com/zsmartex/finex/config"
-	"gitlab.com/zsmartex/finex/models"
-	"gitlab.com/zsmartex/finex/types"
+	"github.com/zsmartex/go-finex/config"
+	"github.com/zsmartex/go-finex/models"
+	"github.com/zsmartex/go-finex/types"
 )
 
 type Depth struct {

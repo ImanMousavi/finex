@@ -4,8 +4,8 @@ import (
 	"encoding/json"
 	"log"
 
-	"gitlab.com/zsmartex/finex/models"
-	"gitlab.com/zsmartex/finex/types"
+	"github.com/zsmartex/go-finex/models"
+	"github.com/zsmartex/go-finex/types"
 )
 
 type OrderProcessorWorker struct {

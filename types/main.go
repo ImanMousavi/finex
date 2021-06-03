@@ -1,6 +1,6 @@
 package types
 
-import "gitlab.com/zsmartex/finex/matching"
+import "github.com/zsmartex/go-finex/matching"
 
 type Depth struct {
 	Asks     [][]float64 `json:"asks"`

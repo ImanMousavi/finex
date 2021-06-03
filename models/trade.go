@@ -3,7 +3,7 @@ package models
 import (
 	"time"
 
-	"gitlab.com/zsmartex/finex/config"
+	"github.com/zsmartex/go-finex/config"
 )
 
 type TakerType = string

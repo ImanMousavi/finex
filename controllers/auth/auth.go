@@ -7,8 +7,8 @@ import (
 
 	"github.com/dgrijalva/jwt-go"
 	"github.com/gofiber/fiber/v2"
-	"gitlab.com/zsmartex/finex/config"
-	"gitlab.com/zsmartex/finex/models"
+	"github.com/zsmartex/go-finex/config"
+	"github.com/zsmartex/go-finex/models"
 )
 
 // Auth struct represents parsed jwt information.

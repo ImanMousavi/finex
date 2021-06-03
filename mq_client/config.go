@@ -12,14 +12,16 @@ import (
 var AMQPCfg *MQClientConfig
 
 func CreateAMQP() (*amqp.Connection, error) {
-	LoadConfig()
+	if err := LoadConfig(); err != nil {
+		return nil, err
+	}
+
 	rabbitmq_username := os.Getenv("RABBITMQ_USERNAME")
 	rabbitmq_password := os.Getenv("RABBITMQ_PASSWORD")
 	rabbitmq_host := os.Getenv("RABBITMQ_HOST")
 	rabbitmq_port := os.Getenv("RABBITMQ_PORT")
 
 	connection, err := amqp.Dial("amqp://" + rabbitmq_username + ":" + rabbitmq_password + "@" + rabbitmq_host + ":" + rabbitmq_port)
-
 	if err != nil {
 		return nil, err
 	}
@@ -27,11 +29,11 @@ func CreateAMQP() (*amqp.Connection, error) {
 	return connection, nil
 }
 
-func LoadConfig() {
+func LoadConfig() error {
 	buf, err := ioutil.ReadFile("config/amqp.yml")
 
 	if err != nil {
-		return
+		return err
 	}
 
 	c := &MQClientConfig{}
@@ -39,10 +41,12 @@ func LoadConfig() {
 	err = yaml.Unmarshal(buf, c)
 
 	if err != nil {
-		return
+		return err
 	}
 
 	AMQPCfg = c
+
+	return nil
 }
 
 func GetPrefetchCount(channel string) int {

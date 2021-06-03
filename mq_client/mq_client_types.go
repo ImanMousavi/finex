@@ -56,5 +56,7 @@ type MQClientConfig struct {
 	Channel struct {
 		TradeExecutor  Channel `yaml:"trade_executor"`
 		OrderProcessor Channel `yaml:"order_processor"`
+		Matching       Channel `yaml:"matching"`
+		DepthCache     Channel `yaml:"depth_cache"`
 	}
 }

@@ -5,10 +5,15 @@ import "github.com/streadway/amqp"
 var AMQPChannel *amqp.Channel
 var Connection *amqp.Connection
 
-func Connect() {
-	cn, _ := CreateAMQP()
+func Connect() error {
+	cn, err := CreateAMQP()
+	if err != nil {
+		return err
+	}
 
 	Connection = cn
+
+	return nil
 }
 
 func GetChannel() *amqp.Channel {

@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	"gitlab.com/zsmartex/finex/config"
+	"github.com/zsmartex/go-finex/config"
 	"gorm.io/gorm"
 )
 

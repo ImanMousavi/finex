@@ -6,9 +6,9 @@ import (
 	"log"
 	"math"
 
-	"gitlab.com/zsmartex/finex/config"
-	"gitlab.com/zsmartex/finex/matching"
-	"gitlab.com/zsmartex/finex/models"
+	"github.com/zsmartex/go-finex/config"
+	"github.com/zsmartex/go-finex/matching"
+	"github.com/zsmartex/go-finex/models"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 )

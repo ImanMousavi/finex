@@ -4,8 +4,8 @@ import (
 	"time"
 
 	"github.com/gofiber/fiber/v2"
-	"gitlab.com/zsmartex/finex/models"
-	"gitlab.com/zsmartex/finex/types"
+	"github.com/zsmartex/go-finex/models"
+	"github.com/zsmartex/go-finex/types"
 )
 
 func GetTimestamp(c *fiber.Ctx) error {

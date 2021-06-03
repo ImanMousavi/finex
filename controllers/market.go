@@ -3,10 +3,10 @@ package controllers
 import (
 	"github.com/gofiber/fiber/v2"
 
-	"gitlab.com/zsmartex/finex/config"
-	"gitlab.com/zsmartex/finex/controllers/auth"
-	"gitlab.com/zsmartex/finex/controllers/helpers"
-	"gitlab.com/zsmartex/finex/models"
+	"github.com/zsmartex/go-finex/config"
+	"github.com/zsmartex/go-finex/controllers/auth"
+	"github.com/zsmartex/go-finex/controllers/helpers"
+	"github.com/zsmartex/go-finex/models"
 )
 
 func CreateOrder(c *fiber.Ctx) error {

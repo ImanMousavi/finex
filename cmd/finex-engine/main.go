@@ -7,9 +7,9 @@ import (
 	"os"
 
 	"github.com/streadway/amqp"
-	"gitlab.com/zsmartex/finex/config"
-	"gitlab.com/zsmartex/finex/mq_client"
-	"gitlab.com/zsmartex/finex/workers"
+	"github.com/zsmartex/go-finex/config"
+	"github.com/zsmartex/go-finex/mq_client"
+	"github.com/zsmartex/go-finex/workers"
 )
 
 var Queue = &[]amqp.Queue{}
@@ -37,10 +37,16 @@ func CreateWorker(id string) workers.Worker {
 }
 
 func main() {
-	config.InitializeConfig()
-	mq_client.Connect()
+	if err := config.InitializeConfig(); err != nil {
+		fmt.Println(err.Error())
+		return
+	}
+	if err := mq_client.Connect(); err != nil {
+		fmt.Println(err.Error())
+		return
+	}
 
-	done := make(chan error)
+	// done := make(chan error)
 
 	Connection = mq_client.Connection
 	Channel := mq_client.GetChannel()
@@ -49,7 +55,7 @@ func main() {
 
 	for _, id := range ARVG {
 		fmt.Println("Start finex-engine " + id)
-		worker := CreateWorker(id)
+		// worker := CreateWorker(id)
 
 		consumer_tag := randomString(16)
 
@@ -83,15 +89,21 @@ func main() {
 			continue
 		}
 
-		go HandleMessage(worker, deliveries, done)
+		for d := range deliveries {
+			fmt.Println(string(d.Body))
+			// worker.Process(d.Body)
+			d.Ack(false)
+		}
+
+		// go HandleMessage(worker, deliveries, done)
 	}
 }
 
-func HandleMessage(worker workers.Worker, deliveries <-chan amqp.Delivery, done chan error) {
-	for msg := range deliveries {
-		worker.Process(msg.Body)
-	}
+// func HandleMessage(worker workers.Worker, deliveries <-chan amqp.Delivery, done chan error) {
+// 	for msg := range deliveries {
+// 		worker.Process(msg.Body)
+// 	}
 
-	log.Printf("handle: deliveries channel closed")
-	done <- nil
-}
+// 	log.Printf("handle: deliveries channel closed")
+// 	done <- nil
+// }

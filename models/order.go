@@ -12,11 +12,11 @@ import (
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 
-	"gitlab.com/zsmartex/finex/config"
-	"gitlab.com/zsmartex/finex/matching"
-	"gitlab.com/zsmartex/finex/models/concerns"
-	"gitlab.com/zsmartex/finex/mq_client"
-	"gitlab.com/zsmartex/finex/types"
+	"github.com/zsmartex/go-finex/config"
+	"github.com/zsmartex/go-finex/matching"
+	"github.com/zsmartex/go-finex/models/concerns"
+	"github.com/zsmartex/go-finex/mq_client"
+	"github.com/zsmartex/go-finex/types"
 )
 
 var precision_validator = &concerns.PrecisionValidator{}

@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 
 	"github.com/ericlagergren/decimal"
-	"gitlab.com/zsmartex/finex/mq_client"
+	"github.com/zsmartex/go-finex/mq_client"
 )
 
 type PayloadAction = string

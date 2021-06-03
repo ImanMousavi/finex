@@ -3,10 +3,10 @@ package helpers
 import (
 	"github.com/gookit/validate"
 
-	"gitlab.com/zsmartex/finex/config"
-	"gitlab.com/zsmartex/finex/matching"
-	"gitlab.com/zsmartex/finex/models"
-	"gitlab.com/zsmartex/finex/types"
+	"github.com/zsmartex/go-finex/config"
+	"github.com/zsmartex/go-finex/matching"
+	"github.com/zsmartex/go-finex/models"
+	"github.com/zsmartex/go-finex/types"
 )
 
 type CreateOrderPayload struct {

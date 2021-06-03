@@ -4,8 +4,8 @@ import (
 	"encoding/json"
 	"log"
 
-	"gitlab.com/zsmartex/finex/matching"
-	"gitlab.com/zsmartex/finex/types"
+	"github.com/zsmartex/go-finex/matching"
+	"github.com/zsmartex/go-finex/types"
 )
 
 type MatchingWorker struct {
