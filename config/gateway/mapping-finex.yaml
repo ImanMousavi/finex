@@ -1,0 +1,8 @@
+---
+apiVersion: ambassador/v1
+kind: Mapping
+name: finex_api_mapping
+host: www.app.local:8080
+prefix: /api/v2/finex
+rewrite: /api/v2
+service: finex-api:3000
