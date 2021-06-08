@@ -72,10 +72,7 @@ func (w *DepthWorker) Process(payload []byte) {
 	}
 
 	depth.Sequence++
-
-	config.Redis.SetKey("finex:"+depth_m.Market+":depth:asks", depth.Asks, redis.KeepTTL)
-	config.Redis.SetKey("finex:"+depth_m.Market+":depth:bids", depth.Bids, redis.KeepTTL)
-	config.Redis.SetKey("finex:"+depth_m.Market+":depth:sequence", depth.Sequence, redis.KeepTTL)
+	w.SaveDepth(depth_m.Market, depth)
 }
 
 func (w *DepthWorker) Reload(market string) {
@@ -98,4 +95,12 @@ func (w *DepthWorker) Reload(market string) {
 func (w *DepthWorker) AddNewDepth(market string) {
 	log.Printf("initializing %s\n", market)
 	w.Depths[market] = depth_service.Fetch(market)
+	w.SaveDepth(market, w.Depths[market])
+
+}
+
+func (w *DepthWorker) SaveDepth(market string, depth *types.Depth) {
+	config.Redis.SetKey("finex:"+market+":depth:asks", depth.Asks, redis.KeepTTL)
+	config.Redis.SetKey("finex:"+market+":depth:bids", depth.Bids, redis.KeepTTL)
+	config.Redis.SetKey("finex:"+market+":depth:sequence", depth.Sequence, redis.KeepTTL)
 }
