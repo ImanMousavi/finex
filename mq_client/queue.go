@@ -4,11 +4,10 @@ import (
 	"log"
 
 	"github.com/streadway/amqp"
-	"github.com/zsmartex/go-finex/pkg/rabbitmq"
 )
 
-var AMQPChannel *rabbitmq.Channel
-var Connection *rabbitmq.Connection
+var AMQPChannel *amqp.Channel
+var Connection *amqp.Connection
 
 func Connect() error {
 	cn, err := CreateAMQP()
@@ -21,7 +20,7 @@ func Connect() error {
 	return nil
 }
 
-func GetChannel() *rabbitmq.Channel {
+func GetChannel() *amqp.Channel {
 	if AMQPChannel != nil {
 		return AMQPChannel
 	} else {

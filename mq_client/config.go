@@ -6,13 +6,13 @@ import (
 	"os"
 	"reflect"
 
-	"github.com/zsmartex/go-finex/pkg/rabbitmq"
+	"github.com/streadway/amqp"
 	"gopkg.in/yaml.v2"
 )
 
 var AMQPCfg *MQClientConfig
 
-func CreateAMQP() (*rabbitmq.Connection, error) {
+func CreateAMQP() (*amqp.Connection, error) {
 	if err := LoadConfig(); err != nil {
 		return nil, err
 	}
@@ -22,7 +22,7 @@ func CreateAMQP() (*rabbitmq.Connection, error) {
 	rabbitmq_host := os.Getenv("RABBITMQ_HOST")
 	rabbitmq_port := os.Getenv("RABBITMQ_PORT")
 
-	connection, err := rabbitmq.Dial("amqp://" + rabbitmq_username + ":" + rabbitmq_password + "@" + rabbitmq_host + ":" + rabbitmq_port)
+	connection, err := amqp.Dial("amqp://" + rabbitmq_username + ":" + rabbitmq_password + "@" + rabbitmq_host + ":" + rabbitmq_port)
 	if err != nil {
 		log.Println("AMQP: Failed to connect to amqp")
 
