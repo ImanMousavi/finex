@@ -3,7 +3,6 @@ package engines
 import (
 	"encoding/json"
 	"log"
-	"sync"
 
 	"github.com/shopspring/decimal"
 	"github.com/zsmartex/go-finex/config"
@@ -13,8 +12,7 @@ import (
 )
 
 type DepthWorker struct {
-	Depths     map[string]*depth_service.DepthService
-	depthMutex sync.RWMutex
+	Depths map[string]*depth_service.DepthService
 }
 
 type DepthCachePayloadMessage struct {
@@ -33,9 +31,6 @@ func NewDeptCachehWorker() *DepthWorker {
 }
 
 func (w *DepthWorker) Process(payload []byte) {
-	w.depthMutex.Lock()
-	defer w.depthMutex.Unlock()
-
 	var depth_m DepthCachePayloadMessage
 	err := json.Unmarshal(payload, &depth_m)
 	if err != nil {
@@ -83,9 +78,6 @@ func (w *DepthWorker) Process(payload []byte) {
 }
 
 func (w *DepthWorker) Reload(market string) {
-	w.depthMutex.Lock()
-	defer w.depthMutex.Unlock()
-
 	switch market {
 	case "all":
 		var Markets []models.Market
@@ -103,9 +95,6 @@ func (w *DepthWorker) Reload(market string) {
 }
 
 func (w *DepthWorker) AddNewDepth(market string) {
-	w.depthMutex.Lock()
-	defer w.depthMutex.Unlock()
-
 	log.Printf("initializing %s\n", market)
 	w.Depths[market] = depth_service.Fetch(market)
 }
