@@ -161,14 +161,14 @@ func (o *Order) Member() Member {
 	return member
 }
 
-type DepthRow struct {
+type PriceLevel struct {
 	Price  decimal.Decimal
 	Amount decimal.Decimal
 }
 
 func GetDepth(side OrderSide, market string) [][]decimal.Decimal {
 	depth := make([][]decimal.Decimal, 0)
-	depthl := make([]DepthRow, 0)
+	price_levels := make([]PriceLevel, 0)
 	tx := config.DataBase.Model(&Order{}).Select("price, sum(volume) as amount").Where("market_id = ? AND ord_type = ? AND state = ? AND type = ?", market, types.TypeLimit, StateWait, side)
 
 	switch side {
@@ -178,9 +178,9 @@ func GetDepth(side OrderSide, market string) [][]decimal.Decimal {
 		tx = tx.Order("price asc")
 	}
 
-	tx.Group("price").Find(&depthl)
+	tx.Group("price").Find(&price_levels)
 
-	for _, row := range depthl {
+	for _, row := range price_levels {
 		depth = append(depth, []decimal.Decimal{row.Price, row.Amount})
 	}
 
