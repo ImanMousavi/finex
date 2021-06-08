@@ -169,7 +169,7 @@ type DepthRow struct {
 func GetDepth(side OrderSide, market string) [][]decimal.Decimal {
 	depth := make([][]decimal.Decimal, 0)
 	depthl := make([]DepthRow, 0)
-	tx := config.DataBase.Model(&Order{}).Select("price, sum(volume) as amount").Where("ord_type = ? AND state = ? AND type = ?", types.TypeLimit, StateWait, side)
+	tx := config.DataBase.Model(&Order{}).Select("price, sum(volume) as amount").Where("market_id = ? AND ord_type = ? AND state = ? AND type = ?", market, types.TypeLimit, StateWait, side)
 
 	switch side {
 	case SideBuy:
