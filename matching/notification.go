@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"time"
 
+	"github.com/go-redis/redis/v8"
 	"github.com/shopspring/decimal"
 	"github.com/zsmartex/go-finex/config"
 	"github.com/zsmartex/go-finex/mq_client"
@@ -55,7 +56,7 @@ func (n *Notification) StartLoop() {
 		}
 
 		n.Sequence++
-		config.Redis.SetKey("finex:"+n.Symbol+":depth:sequence", n.Sequence, 0)
+		config.Redis.SetKey("finex:"+n.Symbol+":depth:sequence", n.Sequence, redis.KeepTTL)
 
 		payload := DepthJSON{
 			Asks:     n.Book.Asks,

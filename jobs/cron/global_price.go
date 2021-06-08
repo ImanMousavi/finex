@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/go-redis/redis/v8"
 	"github.com/zsmartex/go-finex/config"
 	"github.com/zsmartex/go-finex/types"
 )
@@ -33,7 +34,7 @@ func (j *GlobalPriceJob) Process() {
 		return
 	}
 
-	config.Redis.SetKey("finex:h24:global_price", global_price, 0)
+	config.Redis.SetKey("finex:h24:global_price", global_price, redis.KeepTTL)
 
 	time.Sleep(10 * time.Minute)
 }

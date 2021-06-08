@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"log"
 
+	"github.com/go-redis/redis/v8"
 	"github.com/shopspring/decimal"
 	"github.com/zsmartex/go-finex/config"
 	"github.com/zsmartex/go-finex/models"
@@ -72,9 +73,9 @@ func (w *DepthWorker) Process(payload []byte) {
 
 	depth.Sequence++
 
-	config.Redis.SetKey("finex:"+depth_m.Market+":depth:asks", depth.Asks, 0)
-	config.Redis.SetKey("finex:"+depth_m.Market+":depth:bids", depth.Bids, 0)
-	config.Redis.SetKey("finex:"+depth_m.Market+":depth:sequence", depth.Sequence, 0)
+	config.Redis.SetKey("finex:"+depth_m.Market+":depth:asks", depth.Asks, redis.KeepTTL)
+	config.Redis.SetKey("finex:"+depth_m.Market+":depth:bids", depth.Bids, redis.KeepTTL)
+	config.Redis.SetKey("finex:"+depth_m.Market+":depth:sequence", depth.Sequence, redis.KeepTTL)
 }
 
 func (w *DepthWorker) Reload(market string) {
