@@ -9,12 +9,11 @@ import (
 	"github.com/streadway/amqp"
 	"github.com/zsmartex/go-finex/config"
 	"github.com/zsmartex/go-finex/mq_client"
-	"github.com/zsmartex/go-finex/pkg/rabbitmq"
 	"github.com/zsmartex/go-finex/workers/engines"
 )
 
 var Queue = &[]amqp.Queue{}
-var Connection *rabbitmq.Connection
+var Connection *amqp.Connection
 
 func randomString(length int) string {
 	b := make([]byte, length)
