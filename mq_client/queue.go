@@ -25,12 +25,14 @@ func GetChannel() *rabbitmq.Channel {
 	if AMQPChannel != nil {
 		return AMQPChannel
 	} else {
-		AMQPChannel, err := Connection.Channel()
+		channel, err := Connection.Channel()
 
 		if err != nil {
 			log.Println("AMQP: Failed to get channel")
 			log.Panic(err)
 		}
+
+		AMQPChannel = channel
 
 		return AMQPChannel
 	}
