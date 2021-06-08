@@ -9,7 +9,7 @@ import (
 	"github.com/streadway/amqp"
 	"github.com/zsmartex/go-finex/config"
 	"github.com/zsmartex/go-finex/mq_client"
-	"github.com/zsmartex/go-finex/workers"
+	"github.com/zsmartex/go-finex/workers/engines"
 )
 
 var Queue = &[]amqp.Queue{}
@@ -21,16 +21,16 @@ func randomString(length int) string {
 	return fmt.Sprintf("%x", b)[:length]
 }
 
-func CreateWorker(id string) workers.Worker {
+func CreateWorker(id string) engines.Worker {
 	switch id {
 	case "matching":
-		return workers.NewMatchingWorker()
+		return engines.NewMatchingWorker()
 	case "order_processor":
-		return workers.NewOrderProcessorWorker()
+		return engines.NewOrderProcessorWorker()
 	case "trade_executor":
-		return workers.NewTradeExecutorWorker()
+		return engines.NewTradeExecutorWorker()
 	case "depth_cache":
-		return workers.NewDeptCachehWorker()
+		return engines.NewDeptCachehWorker()
 	default:
 		return nil
 	}
@@ -54,8 +54,8 @@ func main() {
 	ARVG := os.Args[1:]
 
 	for _, id := range ARVG {
-		fmt.Println("Start finex-engine " + id)
-		// worker := CreateWorker(id)
+		fmt.Println("Start finex-engine: " + id)
+		worker := CreateWorker(id)
 
 		consumer_tag := randomString(16)
 
@@ -70,28 +70,35 @@ func main() {
 		exchange_name, exchange_kind := mq_client.GetExchange(binding_queue_id)
 		routing_key := mq_client.GetRoutingKey(id)
 
-		Channel.ExchangeDeclare(exchange_name, exchange_kind, binding_queue.Durable, false, false, false, nil)
-		Channel.QueueDeclare(binding_queue.Name, binding_queue.Durable, false, false, false, nil)
+		if err := Channel.ExchangeDeclare(exchange_name, exchange_kind, binding_queue.Durable, false, false, false, nil); err != nil {
+			log.Fatalf("Exchange Declare: %v\n", err)
+			return
+		}
+		// Channel.ExchangeBind(destination string, key string, source string, noWait bool, args amqp.Table)
+		if _, err := Channel.QueueDeclare(binding_queue.Name, binding_queue.Durable, false, false, false, nil); err != nil {
+			log.Fatalf("Queue Declare: %v\n", err)
+			return
+		}
 		Channel.QueueBind(binding_queue.Name, routing_key, exchange_name, false, nil)
 
 		deliveries, err := Channel.Consume(
 			binding_queue.Name,
 			consumer_tag,
 			false,
-			true,
+			false,
 			false,
 			false,
 			nil,
 		)
 
 		if err != nil {
-			log.Printf("Queue Consume: %s", err)
+			log.Printf("Queue Consume: %v", err)
 			continue
 		}
 
 		for d := range deliveries {
-			fmt.Println(string(d.Body))
-			// worker.Process(d.Body)
+			log.Printf("Receive message: %s\n", string(d.Body))
+			worker.Process(d.Body)
 			d.Ack(false)
 		}
 

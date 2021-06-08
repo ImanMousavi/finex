@@ -2,8 +2,8 @@ package matching
 
 import (
 	"encoding/json"
+	"log"
 
-	"github.com/ericlagergren/decimal"
 	"github.com/zsmartex/go-finex/mq_client"
 )
 
@@ -12,12 +12,8 @@ type PayloadAction = string
 var (
 	ActionSubmit PayloadAction = "submit"
 	ActionCancel PayloadAction = "cancel"
+	ActionReload PayloadAction = "reload"
 )
-
-type MatchingPayloadMessage struct {
-	Action PayloadAction `json:"action"`
-	Order  Order         `json:"order"`
-}
 
 var ORDER_SUBMIT_MAX_ATTEMPTS = 3
 
@@ -31,35 +27,30 @@ func NewEngine(market string) *Engine {
 		Market: market,
 		OrderBook: NewOrderBook(
 			market,
-			decimal.New(0, 0),
-			NewTradeBook(market),
-			NOPOrderRepository,
 		),
 	}
 }
 
-func (e Engine) Submit(order Order, attempt int) {
-	_, err := e.OrderBook.Add(order)
+func (e Engine) Submit(order *Order) {
+	log.Printf("Submiting order_id: %v\n", order.ID)
+	trades := e.OrderBook.InsertOrder(order)
 
-	if err != nil {
-		if attempt > ORDER_SUBMIT_MAX_ATTEMPTS {
-			PublishCancel(order)
-		} else {
-			e.Submit(order, attempt+1)
-		}
+	for _, trade := range trades {
+		trade_message, _ := json.Marshal(trade)
+		mq_client.Enqueue("trade_executor", trade_message)
 	}
 }
 
-func (e Engine) Cancel(order Order) {
-	e.OrderBook.Cancel(order.ID)
+func (e Engine) Cancel(order *Order) {
+	e.OrderBook.CancelOrder(order)
 
 	PublishCancel(order)
 }
 
-func PublishCancel(order Order) {
-	order_processor_message, err := json.Marshal(MatchingPayloadMessage{
-		Action: "cancel",
-		Order:  order,
+func PublishCancel(order *Order) {
+	order_processor_message, err := json.Marshal(map[string]interface{}{
+		"action": ActionCancel,
+		"order":  order,
 	})
 
 	if err != nil {

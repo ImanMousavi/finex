@@ -7,7 +7,7 @@ import (
 type PrecisionValidator struct {
 }
 
-func (p PrecisionValidator) LessThanOrEqTo(value float64, precision int32) bool {
-	value_rounded, _ := decimal.NewFromFloat(value).Round(precision).Float64()
-	return value == value_rounded
+func (p PrecisionValidator) LessThanOrEqTo(value decimal.Decimal, precision int32) bool {
+	value_rounded := value.Round(precision)
+	return value.Equal(value_rounded)
 }

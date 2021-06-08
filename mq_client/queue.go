@@ -1,6 +1,10 @@
 package mq_client
 
-import "github.com/streadway/amqp"
+import (
+	"log"
+
+	"github.com/streadway/amqp"
+)
 
 var AMQPChannel *amqp.Channel
 var Connection *amqp.Connection
@@ -26,17 +30,18 @@ func GetChannel() *amqp.Channel {
 	}
 }
 
-func Publish(eid string, payload []byte, routing_key string) error {
-	_n, _t := GetExchange(eid)
+func Publish(eid string, queue Queue, payload []byte, routing_key string) error {
+	exchangeName, exchangeKind := GetExchange(eid)
 
-	err := GetChannel().ExchangeDeclare(_n, _t, false, false, false, false, nil)
+	err := GetChannel().ExchangeDeclare(exchangeName, exchangeKind, queue.Durable, false, false, false, nil)
 
 	if err != nil {
+		log.Println(err)
 		return err
 	}
 
 	GetChannel().Publish(
-		eid,
+		exchangeName,
 		routing_key,
 		false,
 		false,
@@ -45,8 +50,8 @@ func Publish(eid string, payload []byte, routing_key string) error {
 			ContentType:     "application/json",
 			ContentEncoding: "",
 			Body:            payload,
-			DeliveryMode:    amqp.Persistent, // 1=non-persistent, 2=persistent
-			Priority:        0,               // 0-9
+			DeliveryMode:    amqp.Transient, // 1=non-persistent, 2=persistent
+			Priority:        0,              // 0-9
 			// a bunch of application/implementation-specific fields
 		},
 	)
@@ -57,14 +62,18 @@ func Publish(eid string, payload []byte, routing_key string) error {
 func Enqueue(id string, payload []byte) {
 	eid := GetBindingExchangeId(id)
 	routing_key := GetRoutingKey(id)
+	queue := GetBindingQueue(id)
 
-	Publish(eid, payload, routing_key)
+	Publish(eid, queue, payload, routing_key)
 }
 
 func EnqueueEvent(kind string, id string, event string, payload []byte) {
-	routing_key := kind + "." + "id" + "." + "event"
+	routing_key := kind + "." + id + "." + event
 
 	GetChannel().ExchangeDeclare("peatio.events.ranger", "topic", false, false, false, false, nil)
+
+	log.Printf("Publishing message to rango routing_key: %s\n", routing_key)
+
 	GetChannel().Publish(
 		"peatio.events.ranger",
 		routing_key,

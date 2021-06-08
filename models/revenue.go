@@ -3,20 +3,21 @@ package models
 import (
 	"time"
 
+	"github.com/shopspring/decimal"
 	"github.com/zsmartex/go-finex/config"
 )
 
 type Revenue struct {
-	ID            uint64    `json:"id"`
-	Code          int32     `json:"code"`
-	CurrencyID    string    `json:"currency_id"`
-	MemberID      uint64    `json:"member_id"`
-	ReferenceType string    `json:"reference_type"`
-	ReferenceID   uint64    `json:"reference_id"`
-	Debit         float64   `json:"debit"`
-	Credit        float64   `json:"credit"`
-	CreatedAt     time.Time `json:"created_at"`
-	UpdatedAt     time.Time `json:"updated_at"`
+	ID            uint64          `json:"id"`
+	Code          int32           `json:"code"`
+	CurrencyID    string          `json:"currency_id"`
+	MemberID      uint64          `json:"member_id"`
+	ReferenceType string          `json:"reference_type"`
+	ReferenceID   uint64          `json:"reference_id"`
+	Debit         decimal.Decimal `json:"debit"`
+	Credit        decimal.Decimal `json:"credit"`
+	CreatedAt     time.Time       `json:"created_at"`
+	UpdatedAt     time.Time       `json:"updated_at"`
 }
 
 func GetRevenueCode(currency Currency) int32 {
@@ -26,7 +27,7 @@ func GetRevenueCode(currency Currency) int32 {
 	return operations_account.Code
 }
 
-func RevenueCredit(amount float64, currency Currency, reference Reference, member_id uint64) {
+func RevenueCredit(amount decimal.Decimal, currency Currency, reference Reference, member_id uint64) {
 	code := GetRevenueCode(currency)
 
 	revenue := Revenue{
@@ -41,7 +42,7 @@ func RevenueCredit(amount float64, currency Currency, reference Reference, membe
 	config.DataBase.Create(&revenue)
 }
 
-func RevenueDebit(amount float64, currency Currency, reference Reference, member_id uint64) {
+func RevenueDebit(amount decimal.Decimal, currency Currency, reference Reference, member_id uint64) {
 	code := GetRevenueCode(currency)
 
 	revenue := Revenue{
@@ -56,7 +57,7 @@ func RevenueDebit(amount float64, currency Currency, reference Reference, member
 	config.DataBase.Create(&revenue)
 }
 
-func RevenueTranfer(amount float64, currency Currency, reference Reference, from_kind, to_kind string, member_id uint64) {
+func RevenueTranfer(amount decimal.Decimal, currency Currency, reference Reference, from_kind, to_kind string, member_id uint64) {
 	RevenueCredit(amount, currency, reference, member_id)
 	RevenueDebit(amount, currency, reference, member_id)
 }

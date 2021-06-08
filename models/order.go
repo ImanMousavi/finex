@@ -1,18 +1,20 @@
 package models
 
 import (
+	"database/sql"
 	"encoding/json"
-	"log"
-	"math"
+	"errors"
+	"strconv"
 	"time"
 
-	"github.com/ericlagergren/decimal"
 	"github.com/google/uuid"
 	"github.com/gookit/validate"
+	"github.com/shopspring/decimal"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 
 	"github.com/zsmartex/go-finex/config"
+	"github.com/zsmartex/go-finex/controllers/entities"
 	"github.com/zsmartex/go-finex/matching"
 	"github.com/zsmartex/go-finex/models/concerns"
 	"github.com/zsmartex/go-finex/mq_client"
@@ -38,31 +40,31 @@ const (
 )
 
 type Order struct {
-	ID            uint64             `json:"id" gorm:"primaryKey"`
-	UUID          uuid.UUID          `json:"uuid" gorm:"default:gen_random_uuid()"`
-	MemberID      uint64             `json:"member_id" validate:"required"`
-	Ask           string             `json:"ask" validate:"required"`
-	Bid           string             `json:"bid" validate:"required"`
-	RemoteId      string             `json:"remote_id" validate:"required"`
-	Price         *float64           `json:"price" validate:"PriceVaildator"`
-	StopPrice     *float64           `json:"stop_price"` // TODO: add vaildate
-	Volume        float64            `json:"volume" validate:"required"`
-	OriginVolume  float64            `json:"origin_volume" validate:"gt:0|OriginVolumeVaildator"`
-	MakerFee      float64            `json:"maker_fee" gorm:"default:0.0"`
-	TakerFee      float64            `json:"taker_fee" gorm:"default:0.0"`
-	MarketID      string             `json:"market_id" validate:"required"`
-	State         OrderState         `json:"state" validate:"required"`
-	Type          OrderSide          `json:"type" validate:"required"`
-	OrdType       matching.OrderType `json:"ord_type" validate:"MarketOrderVaildator"`
-	Locked        float64            `json:"locked" gorm:"default:0.0"`
-	OriginLocked  float64            `json:"origin_locked" gorm:"default:0.0"`
-	FundsReceived float64            `json:"funds_received" gorm:"default:0.0"`
-	TradesCount   uint64             `json:"trades_count" gorm:"default:0"`
-	CreatedAt     time.Time          `json:"created_at"`
-	UpdatedAt     time.Time          `json:"updated_at"`
+	ID            uint64              `json:"id" gorm:"primaryKey"`
+	UUID          uuid.UUID           `json:"uuid" gorm:"default:gen_random_uuid()"`
+	MemberID      uint64              `json:"member_id" validate:"required"`
+	Ask           string              `json:"ask" validate:"required"`
+	Bid           string              `json:"bid" validate:"required"`
+	RemoteId      sql.NullString      `json:"remote_id"`
+	Price         decimal.NullDecimal `json:"price" gorm:"type:numeric(32,16)" validate:"PriceVaildator"`
+	StopPrice     decimal.NullDecimal `json:"stop_price" gorm:"type:numeric(32,16)" validate:"StopPriceVaildator"`
+	Volume        decimal.Decimal     `json:"volume" gorm:"type:numeric(32,16)" validate:"required"`
+	OriginVolume  decimal.Decimal     `json:"origin_volume" gorm:"type:numeric(32,16)" validate:"OriginVolumeVaildator"`
+	MakerFee      decimal.Decimal     `json:"maker_fee" gorm:"type:numeric(17,16)|default:0.0"`
+	TakerFee      decimal.Decimal     `json:"taker_fee" gorm:"type:numeric(17,16)|default:0.0"`
+	MarketID      string              `json:"market_id" validate:"required"`
+	State         OrderState          `json:"state"`
+	Type          OrderSide           `json:"type" validate:"required"`
+	OrdType       types.OrderType     `json:"ord_type" validate:"OrdTypeVaildator"`
+	Locked        decimal.Decimal     `json:"locked" gorm:"type:numeric(32,16)|default:0.0"`
+	OriginLocked  decimal.Decimal     `json:"origin_locked" gorm:"type:numeric(32,16)|default:0.0"`
+	FundsReceived decimal.Decimal     `json:"funds_received" gorm:"type:numeric(32,16)|default:0.0"`
+	TradesCount   uint64              `json:"trades_count" gorm:"default:0"`
+	CreatedAt     time.Time           `json:"created_at"`
+	UpdatedAt     time.Time           `json:"updated_at"`
 }
 
-func (o *Order) Message() map[string]string {
+func (o Order) Message() map[string]string {
 	invalid_message := "market.order.invalid_{field}"
 
 	return validate.MS{
@@ -70,62 +72,83 @@ func (o *Order) Message() map[string]string {
 	}
 }
 
-// func (o Order) Validate(err_src *Errors) {
-// 	v := validate.Struct(o)
+func (o Order) PriceVaildator(Price decimal.NullDecimal) bool {
+	if o.OrdType == types.TypeMarket {
+		return true // skip
+	}
 
-// 	if !v.Validate() {
-// 		for _, errs := range v.Errors.All() {
-// 			for _, err := range errs {
-// 				errors = append(errors, err)
-// 			}
-// 		}
-// 	}
-// }
+	dPrice := Price.Decimal
 
-func (o *Order) PriceVaildator(Price float64) bool {
 	market := o.Market()
+	PricePrecision := int32(market.PricePrecision)
 
-	if !o.IsLimitOrder() {
+	if dPrice.LessThanOrEqual(decimal.Zero) {
 		return false
 	}
 
-	if Price <= 0 {
+	if !precision_validator.LessThanOrEqTo(dPrice, PricePrecision) {
 		return false
 	}
 
-	if !precision_validator.LessThanOrEqTo(Price, market.PricePrecision) {
-		return false
-	}
-
-	if Price > market.MaxPrice && market.MaxPrice != 0 || Price < market.MinPrice && market.MinPrice != 0 {
+	if dPrice.GreaterThan(market.MaxPrice) && market.MaxPrice.IsPositive() || dPrice.LessThan(market.MinPrice) && market.MinPrice.IsPositive() {
 		return false
 	}
 
 	return true
 }
 
-func (o *Order) OriginVolumeVaildator(OriginVolume float64) bool {
-	market := o.Market()
+func (o Order) StopPriceVaildator(StopPrice decimal.NullDecimal) bool {
+	if o.OrdType == types.TypeMarket {
+		return true // skip
+	}
 
-	if !precision_validator.LessThanOrEqTo(OriginVolume, market.AmountPrecision) {
+	dStopPrice := StopPrice.Decimal
+
+	market := o.Market()
+	PricePrecision := int32(market.PricePrecision)
+
+	if dStopPrice.LessThanOrEqual(decimal.Zero) {
 		return false
 	}
 
-	if OriginVolume < market.MinAmount {
+	if !precision_validator.LessThanOrEqTo(dStopPrice, PricePrecision) {
+		return false
+	}
+
+	if dStopPrice.GreaterThan(market.MaxPrice) && market.MaxPrice.IsPositive() || dStopPrice.LessThan(market.MinPrice) && market.MinPrice.IsPositive() {
 		return false
 	}
 
 	return true
 }
 
-func (o *Order) MarketOrderVaildator(ord_type string) bool {
-	return o.Price != nil
+func (o Order) OriginVolumeVaildator(OriginVolume decimal.Decimal) bool {
+	market := o.Market()
+	AmountPrecision := int32(market.AmountPrecision)
+
+	if !precision_validator.LessThanOrEqTo(OriginVolume, AmountPrecision) {
+		return false
+	}
+
+	if OriginVolume.LessThan(market.MinAmount) {
+		return false
+	}
+
+	return true
 }
 
-func (o Order) Market() Market {
+func (o Order) OrdTypeVaildator(ord_type types.OrderType) bool {
+	if o.OrdType == types.TypeMarket {
+		return !o.Price.Valid && !o.StopPrice.Valid
+	}
+
+	return true
+}
+
+func (o *Order) Market() Market {
 	var market Market
 
-	config.DataBase.Find(&market, o.MarketID)
+	config.DataBase.First(&market, "id = ?", o.MarketID)
 
 	return market
 }
@@ -139,14 +162,14 @@ func (o *Order) Member() Member {
 }
 
 type DepthRow struct {
-	Price  float64
-	Amount float64
+	Price  decimal.Decimal
+	Amount decimal.Decimal
 }
 
-func GetDepth(side OrderSide, market string) [][]float64 {
-	depth := make([][]float64, 0)
+func GetDepth(side OrderSide, market string) [][]decimal.Decimal {
+	depth := make([][]decimal.Decimal, 0)
 	depthl := make([]DepthRow, 0)
-	tx := config.DataBase.Model(&Order{}).Select("price, sum(volume) as amount").Where("ord_type = ? AND state = ? AND type = ?", matching.TypeLimit, StateWait, side)
+	tx := config.DataBase.Model(&Order{}).Select("price, sum(volume) as amount").Where("ord_type = ? AND state = ? AND type = ?", types.TypeLimit, StateWait, side)
 
 	switch side {
 	case SideBuy:
@@ -158,84 +181,100 @@ func GetDepth(side OrderSide, market string) [][]float64 {
 	tx.Group("price").Find(&depthl)
 
 	for _, row := range depthl {
-		depth = append(depth, []float64{row.Price, row.Amount})
+		depth = append(depth, []decimal.Decimal{row.Price, row.Amount})
 	}
 
 	return depth
 }
 
-func SubmitOrder(id uint64) {
+func SubmitOrder(id uint64) error {
 	var order *Order
 
 	err := config.DataBase.Transaction(func(tx *gorm.DB) error {
-		tx.Clauses(clause.Locking{Strength: "UPDATE"})
+		tx.Clauses(clause.Locking{Strength: "UPDATE", Table: clause.Table{Name: "orders"}}).Where("id = ?", id).First(&order)
 
-		tx.Find(&order, id)
+		if order == nil {
+			return errors.New("Can't find order by id : " + strconv.FormatUint(order.ID, 10))
+		}
+
 		if order.State != StatePending {
 			return nil
 		}
 
-		order.HoldAccount(tx).LockFunds(tx, order.Locked)
+		order.HoldAccount(tx.Clauses(clause.Locking{Strength: "UPDATE", Table: clause.Table{Name: "accounts"}})).LockFunds(tx, order.Locked)
 		order.RecordSubmitOperations()
 
-		tx.Update("state", StateWait)
+		order.State = StateWait
+		tx.Save(&order)
+
+		payload_matching_attrs, _ := json.Marshal(map[string]interface{}{
+			"action": matching.ActionSubmit,
+			"order":  order.ToMatchingAttributes(),
+		})
+		mq_client.Enqueue("matching", payload_matching_attrs)
 
 		return nil
 	})
 
 	if err != nil {
-		config.DataBase.Find(&order, id)
+		config.DataBase.Where("id = ?", id).First(&order)
 		if order != nil {
-			config.DataBase.Updates(Order{State: StateReject})
+			order.State = StateReject
+			config.DataBase.Save(&order)
 		}
 
-		log.Println(err)
+		return err
 	}
+
+	return nil
 }
 
-func CancelOrder(id uint64) {
+func CancelOrder(id uint64) error {
 	var order *Order
 
 	err := config.DataBase.Transaction(func(tx *gorm.DB) error {
-		tx.Clauses(clause.Locking{Strength: "UPDATE"})
+		tx.Clauses(clause.Locking{Strength: "UPDATE", Table: clause.Table{Name: "orders"}}).Where("id = ?", id).First(&order)
 
-		tx.Where("id = ?", id).Find(&order)
+		if order == nil {
+			return errors.New("Can't find order by id : " + string(rune(order.ID)))
+		}
+
 		if order.State != StateWait {
 			return nil
 		}
 
-		order.HoldAccount(tx).UnlockFunds(tx, order.Locked)
+		order.HoldAccount(tx.Clauses(clause.Locking{Strength: "UPDATE", Table: clause.Table{Name: "accounts"}})).UnlockFunds(tx, order.Locked)
 		order.RecordCancelOperations()
 
-		tx.Update("state", StateCancel)
+		order.State = StateCancel
+		tx.Save(&order)
 
 		return nil
 	})
 
-	if err != nil {
-		config.DataBase.Find(&order, id)
-		if order != nil {
-			config.DataBase.Updates(Order{State: StateReject})
-		}
-
-		log.Println(err)
-	}
+	return err
 }
 
 // Submit order to matching engine
-func (o *Order) Submit(err_src *[]string) {
-	LOCKING_BUFFER_FACTOR := 1.1
-	var locked float64
+func (o *Order) Submit() error {
+	LOCKING_BUFFER_FACTOR := decimal.NewFromFloat(1.1)
+	var locked decimal.Decimal
 	member_balance := o.MemberBalance()
 
-	if o.OrdType == matching.TypeMarket && o.Type == SideBuy {
-		locked = math.Min(o.ComputeLocked()*LOCKING_BUFFER_FACTOR, member_balance)
-	} else {
-		locked = o.ComputeLocked()
+	cache_locked, err := o.ComputeLocked()
+
+	if err != nil {
+		return err
 	}
 
-	if member_balance >= locked {
-		*err_src = append(*err_src, "market.account.insufficient_balance")
+	if o.OrdType == types.TypeMarket && o.Type == SideBuy {
+		locked = decimal.Min(cache_locked.Mul(LOCKING_BUFFER_FACTOR), member_balance)
+	} else {
+		locked = cache_locked
+	}
+
+	if member_balance.LessThan(locked) {
+		return errors.New("market.account.insufficient_balance")
 	}
 
 	o.Locked = locked
@@ -243,20 +282,30 @@ func (o *Order) Submit(err_src *[]string) {
 
 	config.DataBase.Save(&o)
 
-	order_processor_payload, _ := json.Marshal(types.OrderProcessorPayloadMessage{
-		Action: types.ActionSubmit,
-		Order:  o.ToMatchingAttributes(),
+	order_processor_payload, _ := json.Marshal(map[string]interface{}{
+		"action": matching.ActionSubmit,
+		"order":  o.ToMatchingAttributes(),
 	})
 
-	if len(*err_src) > 0 {
-		return
-	}
-
 	mq_client.Enqueue("order_processor", order_processor_payload)
+	return nil
+}
+
+func (o *Order) BeforeSave(tx *gorm.DB) (err error) {
+	o.TriggerEvent()
+
+	return nil
 }
 
 func (o *Order) TriggerEvent() {
+	if o.State == StatePending {
+		return
+	}
 
+	member := o.Member()
+	payload_message, _ := json.Marshal(o.ToJSON())
+
+	mq_client.EnqueueEvent("private", member.UID, "order", payload_message)
 }
 
 func (o *Order) RecordSubmitOperations() {
@@ -290,7 +339,7 @@ func (o Order) RecordCancelOperations() {
 func (o *Order) AskCurrency() Currency {
 	var currency Currency
 
-	config.DataBase.Where("code = ?", o.Ask).Find(&currency, 1)
+	config.DataBase.First(&currency, "id = ?", o.Ask)
 
 	return currency
 }
@@ -298,7 +347,7 @@ func (o *Order) AskCurrency() Currency {
 func (o *Order) BidCurrency() Currency {
 	var currency Currency
 
-	config.DataBase.Where("code = ?", o.Bid).Find(&currency, 1)
+	config.DataBase.First(&currency, "id = ?", o.Bid)
 
 	return currency
 }
@@ -330,7 +379,7 @@ func (o *Order) Currency() Currency {
 	}
 }
 
-func (o *Order) MemberBalance() float64 {
+func (o *Order) MemberBalance() decimal.Decimal {
 	return o.Member().GetAccount(o.Currency()).Balance
 }
 
@@ -339,31 +388,50 @@ func (o *Order) HoldAccount(tx *gorm.DB) *Account {
 
 	switch o.Type {
 	case SideBuy:
-		tx.Where("member_id = ? AND bid = ?", o.MemberID, o.Bid).FirstOrCreate(&account)
+		tx.Where("member_id = ? AND currency_id = ?", o.MemberID, o.Bid).FirstOrCreate(&account)
 	case SideSell:
-		tx.Where("member_id = ? AND ask = ?", o.MemberID, o.Ask).FirstOrCreate(&account)
+		tx.Where("member_id = ? AND currency_id = ?", o.MemberID, o.Ask).FirstOrCreate(&account)
 	}
 
 	return account
 }
 
-func (o *Order) ComputeLocked() float64 {
-	switch o.OrdType {
-	case matching.TypeLimit:
-		switch o.Type {
-		case SideBuy:
-			return *o.Price * o.Volume
-		default:
-			return o.Volume
+func (o *Order) ComputeLocked() (decimal.Decimal, error) {
+	if o.OrdType == types.TypeLimit {
+		if o.Type == SideBuy {
+			return o.Price.Decimal.Mul(o.Volume), nil
+		} else {
+			return o.Volume, nil
 		}
-	default:
-		switch o.Type {
-		case SideBuy:
-			return o.Volume
-		default:
-			return 0.0
+	} else if o.OrdType == types.TypeMarket {
+		required_funds := decimal.Zero
+		expected_volume := o.Volume
+
+		price_levels := GetDepth(o.Type, o.MarketID)
+		for !expected_volume.IsZero() && len(price_levels) != 0 {
+			i := len(price_levels) - 1
+			pl := price_levels[i]
+			price_levels = append(price_levels[:i], price_levels[i+1:]...)
+
+			level_price := pl[0]
+			level_volume := pl[1]
+
+			v := decimal.Min(expected_volume, level_volume)
+			if o.Type == SideBuy {
+				required_funds = required_funds.Add(level_price.Mul(v))
+			} else {
+				required_funds = required_funds.Add(v)
+			}
+			expected_volume = expected_volume.Sub(v)
 		}
+
+		if !expected_volume.IsZero() {
+			return decimal.Zero, errors.New("market.order.insufficient_market_liquidity")
+		}
+		return required_funds, nil
 	}
+
+	return decimal.Zero, nil
 }
 
 func (o *Order) IsLimitOrder() bool {
@@ -378,28 +446,30 @@ func (o *Order) IsCancelled() bool {
 	return o.State == StateCancel
 }
 
-func (o *Order) FundsUsed() float64 {
-	return o.OriginLocked - o.Locked
+func (o *Order) FundsUsed() decimal.Decimal {
+	return o.OriginLocked.Sub(o.Locked)
 }
 
-func (o *Order) AvgPrice() float64 {
-	if o.Type == SideSell && o.FundsUsed() == 0 || o.Type == SideBuy && o.FundsReceived == 0 {
-		return 0
+func (o *Order) AvgPrice() decimal.Decimal {
+	if o.Type == SideSell && o.FundsUsed().IsZero() || o.Type == SideBuy && o.FundsReceived.IsZero() {
+		return decimal.Zero
 	}
+
+	market := o.Market()
 
 	if o.Type == SideSell {
-		return o.Market().round_price(o.FundsReceived / o.FundsUsed())
+		return market.round_price(o.FundsReceived.Div(o.FundsUsed()))
 	} else {
-		return o.Market().round_price(o.FundsUsed() / o.FundsReceived)
+		return market.round_price(o.FundsUsed().Div(o.FundsReceived))
 	}
 }
 
-func (o *Order) Side() string {
+func (o *Order) Side() types.TakerType {
 	switch o.Type {
 	case SideBuy:
-		return TypeBuy
+		return types.TypeBuy
 	default:
-		return TypeSell
+		return types.TypeSell
 	}
 }
 
@@ -407,24 +477,7 @@ func EstimateRequiredFunds() {
 
 }
 
-type OrderUserJSON struct {
-	Id              uint64             `json:"id"`
-	Uuid            uuid.UUID          `json:"uuid"`
-	Market          string             `json:"market"`
-	Side            string             `json:"side"`
-	OrdType         matching.OrderType `json:"ord_type"`
-	Price           *float64           `json:"price"`
-	AvgPrice        float64            `json:"avg_price"`
-	State           string             `json:"state"`
-	OriginVolume    float64            `json:"origin_volume"`
-	RemainingVolume float64            `json:"remaining_volume"`
-	ExecutedVolume  float64            `json:"executed_volume"`
-	TradesCount     uint64             `json:"trades_count"`
-	CreatedAt       time.Time          `json:"created_at"`
-	UpdatedAt       time.Time          `json:"updated_at"`
-}
-
-func (o *Order) ToJSON() OrderUserJSON {
+func (o *Order) ToJSON() entities.OrderEntities {
 	var StateString string
 	var SideString string
 
@@ -448,49 +501,48 @@ func (o *Order) ToJSON() OrderUserJSON {
 		SideString = "sell"
 	}
 
-	return OrderUserJSON{
-		Id:              o.ID,
-		Uuid:            o.UUID,
+	return entities.OrderEntities{
+		ID:              o.ID,
+		UUID:            o.UUID,
 		Market:          o.MarketID,
 		Side:            SideString,
 		OrdType:         o.OrdType,
 		Price:           o.Price,
+		StopPrice:       o.StopPrice,
 		AvgPrice:        o.AvgPrice(),
 		State:           StateString,
 		OriginVolume:    o.OriginVolume,
 		RemainingVolume: o.Volume,
-		ExecutedVolume:  (o.OriginVolume - o.Volume),
+		ExecutedVolume:  o.OriginVolume.Sub(o.Volume),
 		TradesCount:     o.TradesCount,
 		CreatedAt:       o.CreatedAt,
 		UpdatedAt:       o.UpdatedAt,
 	}
 }
 
-func (o *Order) ToMatchingAttributes() matching.Order {
-	var Params matching.OrderParams
+func FloatToString(input_num float64) string {
+	// to convert a float number to a string
+	return strconv.FormatFloat(input_num, 'f', 6, 64)
+}
 
-	if IsStopLimitOrder := o.StopPrice != nil; IsStopLimitOrder {
-		Params = matching.ParamStop
+func (o *Order) ToMatchingAttributes() map[string]interface{} {
+	var side matching.Side
+	if o.Type == SideBuy {
+		side = matching.SideBuy
 	} else {
-		Params = 0
+		side = matching.SideSell
 	}
 
-	decimalCtx := decimal.Big{}
-
-	return matching.Order{
-		ID:         o.ID,
-		Instrument: o.MarketID,
-		CustomerID: o.MemberID,
-
-		Type:      o.OrdType,
-		Params:    Params,
-		Qty:       *decimalCtx.SetFloat64(o.OriginVolume),
-		FilledQty: *decimalCtx.SetFloat64(o.Volume),
-		Price:     *decimalCtx.SetFloat64(*o.Price),
-		StopPrice: *decimalCtx.SetFloat64(*o.StopPrice),
-		Side:      o.Type == SideBuy, // true for Bid || Buy
-		Cancelled: o.IsCancelled(),
-
-		Timestamp: o.CreatedAt,
+	return map[string]interface{}{
+		"id":                  o.ID,
+		"symbol":              o.MarketID,
+		"member_id":           o.MemberID,
+		"side":                side,
+		"price":               o.Price,
+		"stop_price":          o.StopPrice,
+		"quantity":            o.OriginVolume,
+		"filled_quantity":     o.OriginVolume.Sub(o.Volume),
+		"immediate_or_cancel": o.State == StateCancel || o.State == StateDone || o.State == StateReject,
+		"created_at":          o.CreatedAt,
 	}
 }

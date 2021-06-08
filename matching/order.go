@@ -1,134 +1,230 @@
 package matching
 
 import (
-	"strings"
 	"time"
 
-	"github.com/ericlagergren/decimal"
+	"github.com/emirpasic/gods/utils"
+	"github.com/shopspring/decimal"
+	log "github.com/sirupsen/logrus"
 )
 
-// determines the order "side" - buy or sell
-type OrderSide bool
+// Side is the orders' side.
+type Side string
 
 const (
-	SideBuy  OrderSide = true
-	SideSell OrderSide = false
+	// SideSell represents the ask order side.
+	SideSell Side = "sell"
+
+	// SideBuy represents the bid order side.
+	SideBuy Side = "buy"
 )
 
-func (o OrderSide) String() string {
-	if o == SideBuy {
-		return "BUY"
-	}
-	return "SELL"
-}
-
-// determines the order "type" - basic types are market and limit
-type OrderType string
-
-const (
-	TypeMarket OrderType = "market"
-	TypeLimit  OrderType = "limit"
-)
-
-// determines order parameters. Each bit turns on a different parameter which changes the way an order is stored and matched
-type OrderParams uint64
-
-func (o OrderParams) appendStr(hasPrefix bool, sb *strings.Builder, param OrderParams, value string) bool {
-	if o.Is(param) {
-		if hasPrefix {
-			sb.WriteRune(' ')
-		}
-		sb.WriteString(value)
-		return true
-	}
-	return hasPrefix
-}
-
-func (o OrderParams) String() string {
-	var sb strings.Builder
-	added := false
-	added = o.appendStr(added, &sb, ParamStop, "STOP")
-	added = o.appendStr(added, &sb, ParamFOK, "FOK")
-	if !o.Is(ParamFOK) {
-		added = o.appendStr(added, &sb, ParamAON, "AON")
-		added = o.appendStr(added, &sb, ParamIOC, "IOC")
-	}
-	added = o.appendStr(added, &sb, ParamGTC, "GTC")
-	added = o.appendStr(added, &sb, ParamGFD, "GFD")
-	added = o.appendStr(added, &sb, ParamGTD, "GTD")
-	return sb.String()
-}
-
-// returns true if a parameter value matches the provided parameters (if param is a subset of o)
-// e.g. ParamFOK.Is(ParamAON) is true, ParamFOK.Is(ParamStop) is false. ParamAON.Is(ParamAON) is true.
-func (o OrderParams) Is(param OrderParams) bool {
-	return o&param == param
-}
-
-const (
-	ParamStop OrderParams = 0x1                 // stop order (has to have stop price set)
-	ParamAON  OrderParams = 0x2                 // all-or-nothing - complete fill or cancel https://www.investopedia.com/terms/a/aon.asp
-	ParamIOC  OrderParams = 0x4                 // immediate-or-cancel - immediately fill what you can, cancel the rest
-	ParamFOK  OrderParams = ParamIOC | ParamAON // IOC + AON - immediately try to fill the whole order
-	ParamGTC  OrderParams = 0x10                // good-till-cancelled -  keep order active until manually cancelled
-	ParamGFD  OrderParams = 0x20                // good-for-day keep order active until the end of the trading day
-	ParamGTD  OrderParams = 0x40                // good-till-date - keep order active until the provided date (including the date)
-)
-
-// Used as a transport object in matching and quick retrieval, represents an order stored somewhere else.
-type OrderTracker struct {
-	OrderID   uint64
-	Type      OrderType
-	Price     float64
-	Side      OrderSide
-	Timestamp int64 // nanoseconds since Epoch
-}
-
-// Represents an order by a customer to buy/sell an Instrument at a specified Price for a certain quantity (Qty).
-// It stores additional data such as an order Timestamp, OrderType, StopPrice etc.
+// Order .
 type Order struct {
-	ID         uint64
-	Instrument string
-	CustomerID uint64
-
-	Type      OrderType   // order type - market or limit
-	Params    OrderParams // order parameters which change the way an order is stored and matched
-	Qty       decimal.Big // quantity - no fractional prices available, no unsigned to prevent accidental huge orders
-	FilledQty decimal.Big // currently filled quantity
-	Price     decimal.Big // used in limit orders
-	StopPrice decimal.Big // used in stop orders
-	Side      OrderSide   // determines whether an order is a bid (buy) or an ask (sell)
-	Cancelled bool        // determines if an order is cancelled. A partially filled order can be cancelled.
-
-	Timestamp time.Time // local timestamp - when did the order arrive
+	ID                uint64              `json:"id"`
+	Symbol            string              `json:"symbol"`
+	MemberID          uint64              `json:"member_id"`
+	Side              Side                `json:"side"`
+	Price             decimal.NullDecimal `json:"price"`
+	StopPrice         decimal.NullDecimal `json:"stop_price"`
+	Quantity          decimal.Decimal     `json:"quantity"`
+	FilledQuantity    decimal.Decimal     `json:"filled_quantity"`
+	ImmediateOrCancel bool                `json:"immediate_or_cancel"`
+	CreatedAt         time.Time           `json:"created_at"`
 }
 
-func (o *Order) IsCancelled() bool {
-	return o.Cancelled
+// Key is used to sort orders in red black tree.
+type Key struct {
+	ID        uint64              `json:"id"`
+	Side      Side                `json:"side"`
+	Price     decimal.NullDecimal `json:"price"`
+	StopPrice decimal.NullDecimal `json:"stop_price"`
+	CreatedAt time.Time           `json:"created_at"`
 }
 
-func (o *Order) IsFilled() bool {
-	return o.Qty.Cmp(&o.FilledQty) == 0
+// Key returns a Key.
+func (o *Order) Key() *Key {
+	return &Key{
+		ID:        o.ID,
+		Side:      o.Side,
+		Price:     o.Price,
+		CreatedAt: o.CreatedAt,
+	}
 }
 
-func (o *Order) IsBid() bool {
-	return o.Side == SideBuy
+// Filled returns true when its filled quantity equals to quantity.
+func (o *Order) Filled() bool {
+	return o.Quantity.Equal(o.FilledQuantity)
 }
 
-func (o *Order) IsAsk() bool {
-	return o.Side == SideSell
+// PendingQuantity is the remaing quantity.
+func (o *Order) PendingQuantity() decimal.Decimal {
+	return o.Quantity.Sub(o.FilledQuantity)
 }
 
-func (o *Order) Cancel() {
-	o.Cancelled = true
+// Fill updates order filled quantity with passing arguments.
+func (o *Order) Fill(quantity decimal.Decimal) {
+	o.FilledQuantity = o.FilledQuantity.Add(quantity)
 }
 
-func (o Order) UnfilledQty() decimal.Big {
-	var _UnfilledQty decimal.Big
-
-	BaseContext.Sub(&_UnfilledQty, &o.Qty, &o.FilledQty)
-
-	return _UnfilledQty
+// IsLimit returns true when the order is limit order.
+func (o *Order) IsLimit() bool {
+	return o.Price.Valid
 }
 
-//go:generate gotemplate "github.com/igrmk/treemap" "orderMap(OrderTracker, bool)"
+// IsMarket returns true when the order is market order.
+func (o *Order) IsMarket() bool {
+	return !o.Price.Valid
+}
+
+// Match matches maker with a taker and returns trade if there is a match.
+func (o *Order) Match(taker *Order) *Trade {
+	maker := o
+	if maker.Side == taker.Side {
+		log.Fatalf("[oceanbook.orderbook] match order with same side %s, %d, %d", maker.Side, maker.ID, taker.ID)
+		return nil
+	}
+
+	var bidOrder *Order
+	var askOrder *Order
+
+	switch maker.Side {
+	case SideBuy:
+		bidOrder = maker
+		askOrder = taker
+
+	case SideSell:
+		bidOrder = taker
+		askOrder = maker
+	}
+
+	switch {
+	case taker.IsLimit():
+		if bidOrder.Price.Decimal.GreaterThanOrEqual(askOrder.Price.Decimal) {
+			filledQuantity := decimal.Min(bidOrder.PendingQuantity(), askOrder.PendingQuantity())
+			total := filledQuantity.Mul(maker.Price.Decimal)
+			bidOrder.Fill(filledQuantity)
+			askOrder.Fill(filledQuantity)
+
+			return &Trade{
+				Symbol:       o.Symbol,
+				Price:        maker.Price.Decimal,
+				Quantity:     filledQuantity,
+				Total:        total,
+				MakerOrderID: maker.ID,
+				TakerOrderID: taker.ID,
+				MakerID:      maker.MemberID,
+				TakerID:      taker.MemberID,
+				CreatedAt:    time.Now(),
+			}
+		}
+
+		return nil
+
+	case taker.IsMarket():
+		filledQuantity := decimal.Min(bidOrder.PendingQuantity(), askOrder.PendingQuantity())
+		total := filledQuantity.Mul(maker.Price.Decimal)
+		bidOrder.Fill(filledQuantity)
+		askOrder.Fill(filledQuantity)
+
+		return &Trade{
+			Symbol:       o.Symbol,
+			Price:        maker.Price.Decimal,
+			Quantity:     filledQuantity,
+			Total:        total,
+			MakerOrderID: maker.ID,
+			TakerOrderID: taker.ID,
+			MakerID:      maker.MemberID,
+			TakerID:      taker.MemberID,
+			CreatedAt:    time.Now(),
+		}
+	}
+
+	return nil
+}
+
+// Comparator is used for comparing Key.
+func Comparator(a, b interface{}) (result int) {
+	this := a.(*Key)
+	that := b.(*Key)
+
+	if this.Side != that.Side {
+		log.Fatalf("[oceanbook.orderbook] compare order with different sides")
+	}
+
+	if this.ID == that.ID {
+		return
+	}
+
+	// based on ask
+	switch {
+	case this.Side == SideSell && this.Price.Decimal.LessThan(that.Price.Decimal):
+		result = 1
+
+	case this.Side == SideSell && this.Price.Decimal.GreaterThan(that.Price.Decimal):
+		result = -1
+
+	case this.Side == SideBuy && this.Price.Decimal.LessThan(that.Price.Decimal):
+		result = -1
+
+	case this.Side == SideBuy && this.Price.Decimal.GreaterThan(that.Price.Decimal):
+		result = 1
+
+	default:
+		switch {
+		case this.CreatedAt.Before(that.CreatedAt):
+			result = 1
+
+		case this.CreatedAt.After(that.CreatedAt):
+			result = -1
+
+		default:
+			result = utils.UInt64Comparator(this.ID, that.ID) * -1
+		}
+	}
+
+	return
+}
+
+// StopComparator is used for comparing Key.
+func StopComparator(a, b interface{}) (result int) {
+	this := a.(*Key)
+	that := b.(*Key)
+
+	if this.Side != that.Side {
+		log.Fatalf("[oceanbook.orderbook] compare order with different sides")
+	}
+
+	if this.ID == that.ID {
+		return
+	}
+
+	// based on ask
+	switch {
+	case this.Side == SideSell && this.StopPrice.Decimal.LessThan(that.StopPrice.Decimal):
+		result = 1
+
+	case this.Side == SideSell && this.StopPrice.Decimal.GreaterThan(that.StopPrice.Decimal):
+		result = -1
+
+	case this.Side == SideBuy && this.StopPrice.Decimal.LessThan(that.StopPrice.Decimal):
+		result = -1
+
+	case this.Side == SideBuy && this.StopPrice.Decimal.GreaterThan(that.StopPrice.Decimal):
+		result = 1
+
+	default:
+		switch {
+		case this.CreatedAt.Before(that.CreatedAt):
+			result = 1
+
+		case this.CreatedAt.After(that.CreatedAt):
+			result = -1
+
+		default:
+			result = utils.UInt64Comparator(this.ID, that.ID) * -1
+		}
+	}
+
+	return
+}

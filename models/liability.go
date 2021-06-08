@@ -3,20 +3,21 @@ package models
 import (
 	"time"
 
+	"github.com/shopspring/decimal"
 	"github.com/zsmartex/go-finex/config"
 )
 
 type Liability struct {
-	ID            uint64    `json:"id"`
-	Code          int32     `json:"code"`
-	CurrencyID    string    `json:"currency_id"`
-	MemberID      uint64    `json:"member_id"`
-	ReferenceType string    `json:"reference_type"`
-	ReferenceID   uint64    `json:"reference_id"`
-	Debit         float64   `json:"debit"`
-	Credit        float64   `json:"credit"`
-	CreatedAt     time.Time `json:"created_at"`
-	UpdatedAt     time.Time `json:"updated_at"`
+	ID            uint64          `json:"id"`
+	Code          int32           `json:"code"`
+	CurrencyID    string          `json:"currency_id"`
+	MemberID      uint64          `json:"member_id"`
+	ReferenceType string          `json:"reference_type"`
+	ReferenceID   uint64          `json:"reference_id"`
+	Debit         decimal.Decimal `json:"debit"`
+	Credit        decimal.Decimal `json:"credit"`
+	CreatedAt     time.Time       `json:"created_at"`
+	UpdatedAt     time.Time       `json:"updated_at"`
 }
 
 func GetOperationsCode(currency Currency, kind string) int32 {
@@ -26,7 +27,7 @@ func GetOperationsCode(currency Currency, kind string) int32 {
 	return operations_account.Code
 }
 
-func LiabilityCredit(amount float64, currency Currency, reference Reference, kind string, member_id uint64) {
+func LiabilityCredit(amount decimal.Decimal, currency Currency, reference Reference, kind string, member_id uint64) {
 	code := GetOperationsCode(currency, kind)
 
 	liability := Liability{
@@ -41,7 +42,7 @@ func LiabilityCredit(amount float64, currency Currency, reference Reference, kin
 	config.DataBase.Create(&liability)
 }
 
-func LiabilityDebit(amount float64, currency Currency, reference Reference, kind string, member_id uint64) {
+func LiabilityDebit(amount decimal.Decimal, currency Currency, reference Reference, kind string, member_id uint64) {
 	code := GetOperationsCode(currency, kind)
 
 	liability := Liability{
@@ -56,7 +57,7 @@ func LiabilityDebit(amount float64, currency Currency, reference Reference, kind
 	config.DataBase.Create(&liability)
 }
 
-func LiabilityTranfer(amount float64, currency Currency, reference Reference, from_kind, to_kind string, member_id uint64) {
+func LiabilityTranfer(amount decimal.Decimal, currency Currency, reference Reference, from_kind, to_kind string, member_id uint64) {
 	LiabilityCredit(amount, currency, reference, from_kind, member_id)
 	LiabilityDebit(amount, currency, reference, to_kind, member_id)
 }

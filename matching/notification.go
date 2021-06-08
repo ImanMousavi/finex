@@ -1,29 +1,45 @@
 package matching
 
 import (
+	"encoding/json"
 	"time"
+
+	"github.com/shopspring/decimal"
+	"github.com/zsmartex/go-finex/config"
+	"github.com/zsmartex/go-finex/mq_client"
 )
 
+type DepthJSON struct {
+	Asks     [][]decimal.Decimal `json:"asks"`
+	Bids     [][]decimal.Decimal `json:"bids"`
+	Sequence uint64              `json:"sequence"`
+}
+
 type Book struct {
-	Asks [][]float64
-	Bids [][]float64
+	Asks [][]decimal.Decimal
+	Bids [][]decimal.Decimal
 }
 
 type Notification struct {
-	Instrument string // instrument name
-	Sequence   uint64
-	Book       *Book
+	Symbol   string // instrument name
+	Sequence uint64
+	Book     *Book
 }
 
-func NewNotification(instrument string) *Notification {
-	return &Notification{
-		Instrument: instrument,
-		Sequence:   0,
+func NewNotification(symbol string) *Notification {
+	notification := &Notification{
+		Symbol:   symbol,
+		Sequence: 0,
 		Book: &Book{
-			Asks: [][]float64{},
-			Bids: [][]float64{},
+			Asks: [][]decimal.Decimal{},
+			Bids: [][]decimal.Decimal{},
 		},
 	}
+
+	config.Redis.GetKey("finex:"+symbol+":depth:sequence", &notification.Sequence)
+	notification.Start()
+
+	return notification
 }
 
 func (n Notification) Start() {
@@ -38,27 +54,47 @@ func (n Notification) StartLoop() {
 			continue
 		}
 
-		// n.Sequence = n.Sequence + 1
+		n.Sequence++
+		config.Redis.SetKey("finex:"+n.Symbol+":depth:sequence", n.Sequence, 0)
 
-		// payload := types.Depth{
-		// 	Asks:     n.Book.Asks,
-		// 	Bids:     n.Book.Bids,
-		// 	Sequence: n.Sequence,
-		// }
+		payload := DepthJSON{
+			Asks:     n.Book.Asks,
+			Bids:     n.Book.Bids,
+			Sequence: n.Sequence,
+		}
 
-		// payload_message, _ := json.Marshal(payload)
+		payload_message, _ := json.Marshal(payload)
 
-		// mq_client.EnqueueEvent("public", n.Instrument, "depth", payload_message)
+		mq_client.EnqueueEvent("public", n.Symbol, "depth", payload_message)
 
-		n.Book.Asks = [][]float64{}
-		n.Book.Bids = [][]float64{}
+		depth_cache_message, _ := json.Marshal(map[string]interface{}{
+			"market": n.Symbol,
+			"depth":  payload,
+		})
+
+		mq_client.Enqueue("depth_cache", depth_cache_message)
+
+		n.Book.Asks = [][]decimal.Decimal{}
+		n.Book.Bids = [][]decimal.Decimal{}
 	}
 }
 
-func (n Notification) Publish(side OrderSide, price float64, amount float64) {
-	if side {
-		n.Book.Bids = append(n.Book.Bids, []float64{price, amount})
+func (n Notification) Publish(side Side, price, amount decimal.Decimal) {
+	if side == SideBuy {
+		for i, item := range n.Book.Bids {
+			if price.Equal(item[0]) {
+				n.Book.Bids = append(n.Book.Bids[:i], n.Book.Bids[i+1:]...)
+			}
+		}
+
+		n.Book.Bids = append(n.Book.Bids, []decimal.Decimal{price, amount})
 	} else {
-		n.Book.Asks = append(n.Book.Bids, []float64{price, amount})
+		for i, item := range n.Book.Asks {
+			if price.Equal(item[0]) {
+				n.Book.Asks = append(n.Book.Asks[:i], n.Book.Asks[i+1:]...)
+			}
+		}
+
+		n.Book.Asks = append(n.Book.Asks, []decimal.Decimal{price, amount})
 	}
 }

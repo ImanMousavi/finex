@@ -1,9 +1,10 @@
-package workers
+package engines
 
 import (
 	"encoding/json"
 	"log"
 
+	"github.com/shopspring/decimal"
 	"github.com/zsmartex/go-finex/config"
 	"github.com/zsmartex/go-finex/models"
 	"github.com/zsmartex/go-finex/services/depth_service"
@@ -20,27 +21,37 @@ type DepthCachePayloadMessage struct {
 }
 
 func NewDeptCachehWorker() *DepthWorker {
-	return &DepthWorker{
+	depth_worker := &DepthWorker{
 		Depths: make(map[string]*depth_service.DepthService),
 	}
+
+	depth_worker.Reload("all")
+
+	return depth_worker
 }
 
 func (w *DepthWorker) Process(payload []byte) {
 	var depth_m DepthCachePayloadMessage
 	err := json.Unmarshal(payload, &depth_m)
 	if err != nil {
-		log.Print(err)
+		log.Println(err)
 	}
 	depth_payload := depth_m.Depth
+
 	depth := w.Depths[depth_m.Market]
 
 	for _, ord := range depth_payload.Asks {
 		price := ord[0]
 		amount := ord[1]
 
-		delete(depth.Asks, price)
-		if amount > 0 {
-			depth.Asks[price] = amount
+		for i, o := range depth.Asks {
+			if price.Equal(o[0]) {
+				depth.Asks = append(depth.Asks[:i], depth.Asks[i+1:]...)
+			}
+		}
+
+		if amount.IsPositive() {
+			depth.Asks = append(depth.Asks, []decimal.Decimal{price, amount})
 		}
 	}
 
@@ -48,18 +59,22 @@ func (w *DepthWorker) Process(payload []byte) {
 		price := ord[0]
 		amount := ord[1]
 
-		delete(depth.Asks, price)
-		if amount > 0 {
-			depth.Bids[price] = amount
+		for i, o := range depth.Bids {
+			if price.Equal(o[0]) {
+				depth.Bids = append(depth.Bids[:i], depth.Bids[i+1:]...)
+			}
+		}
+
+		if amount.IsPositive() {
+			depth.Bids = append(depth.Bids, []decimal.Decimal{price, amount})
 		}
 	}
+
 	depth.Sequence++
 
-	depth_j := depth.ToJSON()
-
-	config.Redis.SetKey("finex:"+depth_m.Market+":depth:asks", depth_j.Asks, -1)
-	config.Redis.SetKey("finex:"+depth_m.Market+":depth:asks", depth_j.Bids, -1)
-	config.Redis.SetKey("finex:"+depth_m.Market+":depth:sequence", depth_j.Sequence, -1)
+	config.Redis.SetKey("finex:"+depth_m.Market+":depth:asks", depth.Asks, 0)
+	config.Redis.SetKey("finex:"+depth_m.Market+":depth:bids", depth.Bids, 0)
+	config.Redis.SetKey("finex:"+depth_m.Market+":depth:sequence", depth.Sequence, 0)
 }
 
 func (w *DepthWorker) Reload(market string) {

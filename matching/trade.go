@@ -3,23 +3,19 @@ package matching
 import (
 	"time"
 
-	"github.com/ericlagergren/decimal"
+	"github.com/shopspring/decimal"
 )
 
-// Trade represents two opposed matched orders.
+// Trade .
 type Trade struct {
-	ID           uint64
-	Instrument   string
-	MakerOrderID uint64
-	TakerOrderID uint64
-	MakerID      uint64
-	TakerID      uint64
-	Price        decimal.Big
-	Qty          decimal.Big
-	Total        decimal.Big
-	Timestamp    time.Time
-}
-
-func NewTrade() {
-
+	ID           uint64          `json:"id"`
+	Symbol       string          `json:"symbol"`
+	Price        decimal.Decimal `json:"price"`
+	Quantity     decimal.Decimal `json:"quantity"`
+	Total        decimal.Decimal `json:"total"`
+	MakerOrderID uint64          `json:"maker_order_id"`
+	TakerOrderID uint64          `json:"taker_order_id"`
+	MakerID      uint64          `json:"maker_id"`
+	TakerID      uint64          `json:"taker_id"`
+	CreatedAt    time.Time       `json:"created_at"`
 }
