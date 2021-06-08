@@ -9,11 +9,12 @@ import (
 	"github.com/streadway/amqp"
 	"github.com/zsmartex/go-finex/config"
 	"github.com/zsmartex/go-finex/mq_client"
+	"github.com/zsmartex/go-finex/pkg/rabbitmq"
 	"github.com/zsmartex/go-finex/workers/engines"
 )
 
 var Queue = &[]amqp.Queue{}
-var Connection *amqp.Connection
+var Connection *rabbitmq.Connection
 
 func randomString(length int) string {
 	b := make([]byte, length)
@@ -41,12 +42,7 @@ func main() {
 		fmt.Println(err.Error())
 		return
 	}
-	if err := mq_client.Connect(); err != nil {
-		fmt.Println(err.Error())
-		return
-	}
-
-	// done := make(chan error)
+	mq_client.Connect()
 
 	Connection = mq_client.Connection
 	Channel := mq_client.GetChannel()
@@ -74,7 +70,6 @@ func main() {
 			log.Fatalf("Exchange Declare: %v\n", err)
 			return
 		}
-		// Channel.ExchangeBind(destination string, key string, source string, noWait bool, args amqp.Table)
 		if _, err := Channel.QueueDeclare(binding_queue.Name, binding_queue.Durable, false, false, false, nil); err != nil {
 			log.Fatalf("Queue Declare: %v\n", err)
 			return
@@ -101,16 +96,5 @@ func main() {
 			worker.Process(d.Body)
 			d.Ack(false)
 		}
-
-		// go HandleMessage(worker, deliveries, done)
 	}
 }
-
-// func HandleMessage(worker workers.Worker, deliveries <-chan amqp.Delivery, done chan error) {
-// 	for msg := range deliveries {
-// 		worker.Process(msg.Body)
-// 	}
-
-// 	log.Printf("handle: deliveries channel closed")
-// 	done <- nil
-// }

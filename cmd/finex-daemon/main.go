@@ -23,10 +23,7 @@ func main() {
 		fmt.Println(err.Error())
 		return
 	}
-	if err := mq_client.Connect(); err != nil {
-		fmt.Println(err.Error())
-		return
-	}
+	mq_client.Connect()
 
 	ARVG := os.Args[1:]
 
