@@ -2,7 +2,6 @@ package matching
 
 import (
 	"encoding/json"
-	"sync"
 	"time"
 
 	"github.com/shopspring/decimal"
@@ -22,10 +21,9 @@ type Book struct {
 }
 
 type Notification struct {
-	Symbol            string // instrument name
-	Sequence          uint64
-	Book              *Book
-	notificationMutex sync.RWMutex
+	Symbol   string // instrument name
+	Sequence uint64
+	Book     *Book
 }
 
 func NewNotification(symbol string) *Notification {
@@ -82,9 +80,6 @@ func (n *Notification) StartLoop() {
 }
 
 func (n *Notification) Publish(side Side, price, amount decimal.Decimal) {
-	n.notificationMutex.Lock()
-	defer n.notificationMutex.Unlock()
-
 	if side == SideBuy {
 		for i, item := range n.Book.Bids {
 			if price.Equal(item[0]) {
