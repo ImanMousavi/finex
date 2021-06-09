@@ -28,11 +28,13 @@ func GetDepth(c *fiber.Ctx) error {
 	}
 
 	var err error
-	msg, err := config.Nats.Request("fetch_depth", []byte(market), 10*time.Second)
+	msg, err := config.Nats.Request("depth:"+market, []byte(market), 10*time.Millisecond)
 
 	if err != nil {
 		return c.Status(200).JSON(depth)
 	}
+
+	log.Println(string(msg.Data))
 
 	err = json.Unmarshal(msg.Data, &depth)
 

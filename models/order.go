@@ -373,9 +373,9 @@ func (o *Order) OutcomeCurrency() Currency {
 func (o *Order) Currency() Currency {
 	switch o.Type {
 	case SideBuy:
-		return o.AskCurrency()
-	default:
 		return o.BidCurrency()
+	default:
+		return o.AskCurrency()
 	}
 }
 

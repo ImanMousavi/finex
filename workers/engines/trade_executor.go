@@ -28,12 +28,12 @@ func NewTradeExecutorWorker() *TradeExecutorWorker {
 	return &TradeExecutorWorker{}
 }
 
-func (w *TradeExecutorWorker) Process(payload []byte) {
+func (w *TradeExecutorWorker) Process(payload []byte) error {
 	trade_executor := &TradeExecutor{}
 
 	if err := json.Unmarshal(payload, &trade_executor.TradePayload); err != nil {
 		log.Print(err)
-		return
+		return err
 	}
 
 	trade, err := trade_executor.CreateTradeAndStrikeOrders()
@@ -53,10 +53,11 @@ func (w *TradeExecutorWorker) Process(payload []byte) {
 
 			config.Nats.Publish("matching", matching_payload_message)
 		}
-		return
+		return err
 	}
 
 	trade_executor.PublishTrade(trade)
+	return nil
 }
 
 func (t *TradeExecutor) VaildateTrade() error {

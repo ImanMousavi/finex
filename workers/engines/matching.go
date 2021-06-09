@@ -29,7 +29,7 @@ func NewMatchingWorker() *MatchingWorker {
 	return worker
 }
 
-func (w MatchingWorker) Process(payload []byte) {
+func (w MatchingWorker) Process(payload []byte) error {
 	var matching_payload MatchingPayloadMessage
 	err := json.Unmarshal(payload, &matching_payload)
 	if err != nil {
@@ -39,23 +39,25 @@ func (w MatchingWorker) Process(payload []byte) {
 	switch matching_payload.Action {
 	case matching.ActionSubmit:
 		order := matching_payload.Order
-		w.SubmitOrder(order)
+		return w.SubmitOrder(order)
 	case matching.ActionCancel:
 		order := matching_payload.Order
-		w.CancelOrder(order)
+		return w.CancelOrder(order)
 	case matching.ActionReload:
 		w.Reload(matching_payload.Market)
 	default:
 		log.Fatalf("Unknown action: %s", matching_payload.Action)
 	}
+
+	return nil
 }
 
-func (w MatchingWorker) SubmitOrder(order *matching.Order) {
-	w.Engines[order.Symbol].Submit(order)
+func (w MatchingWorker) SubmitOrder(order *matching.Order) error {
+	return w.Engines[order.Symbol].Submit(order)
 }
 
-func (w MatchingWorker) CancelOrder(order *matching.Order) {
-	w.Engines[order.Symbol].Cancel(order)
+func (w MatchingWorker) CancelOrder(order *matching.Order) error {
+	return w.Engines[order.Symbol].Cancel(order)
 }
 
 func (w MatchingWorker) AddNewEngine(market string) *matching.Engine {

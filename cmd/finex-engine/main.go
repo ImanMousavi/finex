@@ -1,12 +1,11 @@
 package main
 
 import (
-	"crypto/rand"
 	"fmt"
 	"log"
 	"os"
+	"time"
 
-	"github.com/nats-io/nats.go"
 	"github.com/streadway/amqp"
 	"github.com/zsmartex/go-finex/config"
 	"github.com/zsmartex/go-finex/mq_client"
@@ -16,12 +15,6 @@ import (
 var Queue = &[]amqp.Queue{}
 var Connection *amqp.Connection
 
-func randomString(length int) string {
-	b := make([]byte, length)
-	rand.Read(b)
-	return fmt.Sprintf("%x", b)[:length]
-}
-
 func CreateWorker(id string) engines.Worker {
 	switch id {
 	case "matching":
@@ -30,8 +23,6 @@ func CreateWorker(id string) engines.Worker {
 		return engines.NewOrderProcessorWorker()
 	case "trade_executor":
 		return engines.NewTradeExecutorWorker()
-	case "depth_cache":
-		return engines.NewDeptCachehWorker()
 	default:
 		return nil
 	}
@@ -74,10 +65,20 @@ func main() {
 		}
 		Channel.QueueBind(binding_queue.Name, routing_key, exchange_name, false, nil)
 
-		config.Nats.QueueSubscribe(id, binding_queue.Name, func(m *nats.Msg) {
+		sub, _ := config.Nats.QueueSubscribeSync(id, binding_queue.Name)
+
+		for {
+			m, err := sub.NextMsg(1 * time.Second)
+
+			if err != nil {
+				continue
+			}
+
 			log.Printf("Receive message: %s\n", string(m.Data))
-			worker.Process(m.Data)
-			m.Ack()
-		})
+			if err := worker.Process(m.Data); err == nil {
+				m.Ack()
+			}
+		}
+
 	}
 }

@@ -18,8 +18,8 @@ type DepthJSON struct {
 }
 
 type Book struct {
-	Asks [][]decimal.Decimal
-	Bids [][]decimal.Decimal
+	Asks map[decimal.Decimal]decimal.Decimal
+	Bids map[decimal.Decimal]decimal.Decimal
 }
 
 type Notification struct {
@@ -34,8 +34,12 @@ func NewNotification(symbol string) *Notification {
 		Symbol:   symbol,
 		Sequence: 0,
 		BookCache: &Book{
-			Asks: [][]decimal.Decimal{},
-			Bids: [][]decimal.Decimal{},
+			Asks: make(map[decimal.Decimal]decimal.Decimal),
+			Bids: make(map[decimal.Decimal]decimal.Decimal),
+		},
+		Book: &Book{
+			Asks: make(map[decimal.Decimal]decimal.Decimal),
+			Bids: make(map[decimal.Decimal]decimal.Decimal),
 		},
 	}
 
@@ -51,14 +55,21 @@ func (n *Notification) Start() {
 }
 
 func (n *Notification) SubscribeFetch() {
-	config.Nats.Subscribe("fetch_depth", func(m *nats.Msg) {
-		depth_message, _ := json.Marshal(map[string]interface{}{
-			"market": n.Symbol,
-			"depth": DepthJSON{
-				Asks:     n.Book.Asks,
-				Bids:     n.Book.Bids,
-				Sequence: n.Sequence,
-			},
+	config.Nats.Subscribe("depth:"+n.Symbol, func(m *nats.Msg) {
+		asks_depth := make([][]decimal.Decimal, 0)
+		bids_depth := make([][]decimal.Decimal, 0)
+
+		for price, amount := range n.Book.Asks {
+			asks_depth = append(asks_depth, []decimal.Decimal{price, amount})
+		}
+		for price, amount := range n.Book.Bids {
+			bids_depth = append(bids_depth, []decimal.Decimal{price, amount})
+		}
+
+		depth_message, _ := json.Marshal(DepthJSON{
+			Asks:     asks_depth,
+			Bids:     bids_depth,
+			Sequence: n.Sequence,
 		})
 
 		m.Respond(depth_message)
@@ -76,9 +87,19 @@ func (n *Notification) StartLoop() {
 		n.Sequence++
 		config.Redis.SetKey("finex:"+n.Symbol+":depth:sequence", n.Sequence, redis.KeepTTL)
 
+		asks_depth := make([][]decimal.Decimal, 0)
+		bids_depth := make([][]decimal.Decimal, 0)
+
+		for price, amount := range n.BookCache.Asks {
+			asks_depth = append(asks_depth, []decimal.Decimal{price, amount})
+		}
+		for price, amount := range n.BookCache.Bids {
+			bids_depth = append(bids_depth, []decimal.Decimal{price, amount})
+		}
+
 		payload := DepthJSON{
-			Asks:     n.BookCache.Asks,
-			Bids:     n.BookCache.Bids,
+			Asks:     asks_depth,
+			Bids:     bids_depth,
 			Sequence: n.Sequence,
 		}
 
@@ -93,47 +114,47 @@ func (n *Notification) StartLoop() {
 
 		config.Nats.Publish("depth_cache", depth_cache_message)
 
-		n.BookCache.Asks = [][]decimal.Decimal{}
-		n.BookCache.Bids = [][]decimal.Decimal{}
+		n.BookCache.Asks = make(map[decimal.Decimal]decimal.Decimal)
+		n.BookCache.Bids = make(map[decimal.Decimal]decimal.Decimal)
 	}
 }
 
 func (n *Notification) Publish(side Side, price, amount decimal.Decimal) {
 	if side == SideBuy {
-		for i, item := range n.BookCache.Bids {
-			if price.Equal(item[0]) {
-				n.BookCache.Bids = append(n.BookCache.Bids[:i], n.BookCache.Bids[i+1:]...)
+		for bprice, _ := range n.BookCache.Bids {
+			if price.Equal(bprice) {
+				delete(n.BookCache.Bids, bprice)
 			}
 		}
 
-		n.BookCache.Bids = append(n.BookCache.Bids, []decimal.Decimal{price, amount})
+		n.BookCache.Bids[price] = amount
 
-		for i, item := range n.Book.Bids {
-			if price.Equal(item[0]) {
-				n.BookCache.Bids = append(n.Book.Bids[:i], n.Book.Bids[i+1:]...)
+		for bprice, _ := range n.Book.Bids {
+			if price.Equal(bprice) {
+				delete(n.Book.Bids, bprice)
 			}
 		}
 
 		if amount.IsPositive() {
-			n.Book.Bids = append(n.Book.Bids, []decimal.Decimal{price, amount})
+			n.Book.Bids[price] = amount
 		}
 	} else {
-		for i, item := range n.BookCache.Asks {
-			if price.Equal(item[0]) {
-				n.BookCache.Asks = append(n.BookCache.Asks[:i], n.BookCache.Asks[i+1:]...)
+		for bprice, _ := range n.BookCache.Asks {
+			if price.Equal(bprice) {
+				delete(n.BookCache.Asks, bprice)
 			}
 		}
 
-		n.BookCache.Asks = append(n.BookCache.Asks, []decimal.Decimal{price, amount})
+		n.BookCache.Asks[price] = amount
 
-		for i, item := range n.Book.Asks {
-			if price.Equal(item[0]) {
-				n.BookCache.Asks = append(n.Book.Asks[:i], n.Book.Asks[i+1:]...)
+		for bprice, _ := range n.Book.Asks {
+			if price.Equal(bprice) {
+				delete(n.Book.Asks, bprice)
 			}
 		}
 
 		if amount.IsPositive() {
-			n.Book.Asks = append(n.Book.Asks, []decimal.Decimal{price, amount})
+			n.Book.Asks[price] = amount
 		}
 	}
 }

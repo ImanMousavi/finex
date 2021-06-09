@@ -31,31 +31,35 @@ func NewEngine(market string) *Engine {
 	}
 }
 
-func (e Engine) Submit(order *Order) {
+func (e Engine) Submit(order *Order) error {
 	log.Printf("Submiting order_id: %v\n", order.ID)
 	trades := e.OrderBook.InsertOrder(order)
 
 	for _, trade := range trades {
 		trade_message, _ := json.Marshal(trade)
-		config.Nats.Publish("trade_executor", trade_message)
+		if err := config.Nats.Publish("trade_executor", trade_message); err != nil {
+			return err
+		}
 	}
+
+	return nil
 }
 
-func (e Engine) Cancel(order *Order) {
+func (e Engine) Cancel(order *Order) error {
 	e.OrderBook.CancelOrder(order)
 
-	PublishCancel(order)
+	return PublishCancel(order)
 }
 
-func PublishCancel(order *Order) {
+func PublishCancel(order *Order) error {
 	order_processor_message, err := json.Marshal(map[string]interface{}{
 		"action": ActionCancel,
 		"order":  order,
 	})
 
 	if err != nil {
-		return
+		return err
 	}
 
-	config.Nats.Publish("order_processor", order_processor_message)
+	return config.Nats.Publish("order_processor", order_processor_message)
 }

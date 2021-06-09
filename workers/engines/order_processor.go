@@ -32,12 +32,13 @@ func NewOrderProcessorWorker() *OrderProcessorWorker {
 	return kclass
 }
 
-func (w OrderProcessorWorker) Process(payload []byte) {
+func (w OrderProcessorWorker) Process(payload []byte) error {
 	var order_processor_payload OrderProcessorPayloadMessage
 	err := json.Unmarshal(payload, &order_processor_payload)
 
 	if err != nil {
 		log.Print(err)
+		return err
 	}
 
 	order := order_processor_payload.Order
@@ -51,5 +52,8 @@ func (w OrderProcessorWorker) Process(payload []byte) {
 
 	if err != nil {
 		log.Print(err)
+		return err
 	}
+
+	return nil
 }

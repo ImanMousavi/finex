@@ -1,5 +1,5 @@
 package engines
 
 type Worker interface {
-	Process(payload []byte)
+	Process(payload []byte) error
 }
