@@ -211,7 +211,7 @@ func SubmitOrder(id uint64) error {
 			"action": matching.ActionSubmit,
 			"order":  order.ToMatchingAttributes(),
 		})
-		mq_client.Enqueue("matching", payload_matching_attrs)
+		config.Nats.Publish("matching", payload_matching_attrs)
 
 		return nil
 	})
@@ -287,7 +287,7 @@ func (o *Order) Submit() error {
 		"order":  o.ToMatchingAttributes(),
 	})
 
-	mq_client.Enqueue("order_processor", order_processor_payload)
+	config.Nats.Publish("order_processor", order_processor_payload)
 	return nil
 }
 

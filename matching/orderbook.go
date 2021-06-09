@@ -47,7 +47,7 @@ func NewOrderBook(symbol string) *OrderBook {
 		cancelOrdersQueue:  make(map[uint64]*Order, 1024),
 		tradeBook:          NewTradeBook(symbol),
 		notification:       notification,
-		depth:              NewDepth(symbol, notification, 16),
+		depth:              NewDepth(symbol, notification),
 	}
 }
 

@@ -13,7 +13,6 @@ import (
 	"github.com/zsmartex/go-finex/controllers/queries"
 	"github.com/zsmartex/go-finex/matching"
 	"github.com/zsmartex/go-finex/models"
-	"github.com/zsmartex/go-finex/mq_client"
 	"github.com/zsmartex/go-finex/types"
 )
 
@@ -183,7 +182,7 @@ func CancelOrderByID(c *fiber.Ctx) error {
 		"action": matching.ActionCancel,
 		"order":  order.ToMatchingAttributes(),
 	})
-	mq_client.Enqueue("matching", payload_matching_attrs)
+	config.Nats.Publish("matching", payload_matching_attrs)
 
 	return c.Status(200).JSON(order.ToJSON())
 }
@@ -236,7 +235,7 @@ func CancelAllOrders(c *fiber.Ctx) error {
 			"action": matching.ActionCancel,
 			"order":  order.ToMatchingAttributes(),
 		})
-		mq_client.Enqueue("matching", payload_matching_attrs)
+		config.Nats.Publish("matching", payload_matching_attrs)
 	}
 
 	var ordersJSON []entities.OrderEntities

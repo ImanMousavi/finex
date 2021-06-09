@@ -10,6 +10,9 @@ func InitializeConfig() error {
 	if err := NewInfluxDB(); err != nil {
 		return err
 	}
+	if err := ConnectNats(); err != nil {
+		return err
+	}
 
 	return nil
 }

@@ -10,7 +10,6 @@ import (
 	"github.com/zsmartex/go-finex/config"
 	"github.com/zsmartex/go-finex/matching"
 	"github.com/zsmartex/go-finex/models"
-	"github.com/zsmartex/go-finex/mq_client"
 	"github.com/zsmartex/go-finex/types"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
@@ -52,7 +51,7 @@ func (w *TradeExecutorWorker) Process(payload []byte) {
 				continue
 			}
 
-			mq_client.Enqueue("matching", matching_payload_message)
+			config.Nats.Publish("matching", matching_payload_message)
 		}
 		return
 	}

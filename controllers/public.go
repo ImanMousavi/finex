@@ -1,6 +1,7 @@
 package controllers
 
 import (
+	"encoding/json"
 	"log"
 	"time"
 
@@ -26,9 +27,18 @@ func GetDepth(c *fiber.Ctx) error {
 		Sequence: 0,
 	}
 
-	config.Redis.GetKey("finex:"+market+":depth:asks", &depth.Asks)
-	config.Redis.GetKey("finex:"+market+":depth:bids", &depth.Bids)
-	config.Redis.GetKey("finex:"+market+":depth:sequence", &depth.Sequence)
+	var err error
+	msg, err := config.Nats.Request("fetch_depth", []byte(market), 10*time.Second)
+
+	if err != nil {
+		return c.Status(200).JSON(depth)
+	}
+
+	err = json.Unmarshal(msg.Data, &depth)
+
+	if err != nil {
+		return c.Status(200).JSON(depth)
+	}
 
 	return c.Status(200).JSON(depth)
 }

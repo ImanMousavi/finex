@@ -6,6 +6,7 @@ import (
 	"log"
 	"os"
 
+	"github.com/nats-io/nats.go"
 	"github.com/streadway/amqp"
 	"github.com/zsmartex/go-finex/config"
 	"github.com/zsmartex/go-finex/mq_client"
@@ -52,8 +53,6 @@ func main() {
 		fmt.Println("Start finex-engine: " + id)
 		worker := CreateWorker(id)
 
-		consumer_tag := randomString(16)
-
 		prefetch := mq_client.GetPrefetchCount(id)
 
 		if prefetch > 0 {
@@ -75,25 +74,10 @@ func main() {
 		}
 		Channel.QueueBind(binding_queue.Name, routing_key, exchange_name, false, nil)
 
-		deliveries, err := Channel.Consume(
-			binding_queue.Name,
-			consumer_tag,
-			false,
-			false,
-			false,
-			false,
-			nil,
-		)
-
-		if err != nil {
-			log.Printf("Queue Consume: %v", err)
-			continue
-		}
-
-		for d := range deliveries {
-			log.Printf("Receive message: %s\n", string(d.Body))
-			worker.Process(d.Body)
-			d.Ack(false)
-		}
+		config.Nats.QueueSubscribe(id, binding_queue.Name, func(m *nats.Msg) {
+			log.Printf("Receive message: %s\n", string(m.Data))
+			worker.Process(m.Data)
+			m.Ack()
+		})
 	}
 }

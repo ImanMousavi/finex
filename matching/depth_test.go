@@ -7,8 +7,8 @@ import (
 )
 
 func TestNewDepth(t *testing.T) {
-	depth := NewDepth("BTC/CNY", &Notification{}, 1)
+	depth := NewDepth("BTC/CNY", &Notification{})
 
-	assert.Equal(t, int64(1), depth.Scale)
+	assert.Equal(t, int64(1), 16)
 	assert.Equal(t, "BTC/CNY", depth.Symbol)
 }

@@ -31,17 +31,16 @@ func (pl *PriceLevel) Key() *PriceLevelKey {
 // Depth .
 type Depth struct {
 	Symbol       string
-	Scale        int64
 	Bids         *rbt.Tree
 	Asks         *rbt.Tree
+	Sequence     uint64
 	Notification *Notification
 }
 
 // NewDepth returns a depth with specific scale.
-func NewDepth(symbol string, notification *Notification, scale int64) *Depth {
+func NewDepth(symbol string, notification *Notification) *Depth {
 	return &Depth{
 		Symbol:       symbol,
-		Scale:        scale,
 		Bids:         rbt.NewWith(PriceLevelComparator),
 		Asks:         rbt.NewWith(PriceLevelComparator),
 		Notification: notification,

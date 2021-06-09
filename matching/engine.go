@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"log"
 
-	"github.com/zsmartex/go-finex/mq_client"
+	"github.com/zsmartex/go-finex/config"
 )
 
 type PayloadAction = string
@@ -37,7 +37,7 @@ func (e Engine) Submit(order *Order) {
 
 	for _, trade := range trades {
 		trade_message, _ := json.Marshal(trade)
-		mq_client.Enqueue("trade_executor", trade_message)
+		config.Nats.Publish("trade_executor", trade_message)
 	}
 }
 
@@ -57,5 +57,5 @@ func PublishCancel(order *Order) {
 		return
 	}
 
-	mq_client.Enqueue("order_processor", order_processor_message)
+	config.Nats.Publish("order_processor", order_processor_message)
 }

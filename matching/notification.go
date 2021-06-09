@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/go-redis/redis/v8"
+	"github.com/nats-io/nats.go"
 	"github.com/shopspring/decimal"
 	"github.com/zsmartex/go-finex/config"
 	"github.com/zsmartex/go-finex/mq_client"
@@ -22,16 +23,17 @@ type Book struct {
 }
 
 type Notification struct {
-	Symbol   string // instrument name
-	Sequence uint64
-	Book     *Book
+	Symbol    string // instrument name
+	Sequence  uint64
+	Book      *Book // cache for fetch depth
+	BookCache *Book // cache for notify to websocket
 }
 
 func NewNotification(symbol string) *Notification {
 	notification := &Notification{
 		Symbol:   symbol,
 		Sequence: 0,
-		Book: &Book{
+		BookCache: &Book{
 			Asks: [][]decimal.Decimal{},
 			Bids: [][]decimal.Decimal{},
 		},
@@ -39,6 +41,7 @@ func NewNotification(symbol string) *Notification {
 
 	config.Redis.GetKey("finex:"+symbol+":depth:sequence", &notification.Sequence)
 	notification.Start()
+	notification.SubscribeFetch()
 
 	return notification
 }
@@ -47,11 +50,26 @@ func (n *Notification) Start() {
 	go n.StartLoop()
 }
 
+func (n *Notification) SubscribeFetch() {
+	config.Nats.Subscribe("fetch_depth", func(m *nats.Msg) {
+		depth_message, _ := json.Marshal(map[string]interface{}{
+			"market": n.Symbol,
+			"depth": DepthJSON{
+				Asks:     n.Book.Asks,
+				Bids:     n.Book.Bids,
+				Sequence: n.Sequence,
+			},
+		})
+
+		m.Respond(depth_message)
+	})
+}
+
 func (n *Notification) StartLoop() {
 	for {
 		time.Sleep(100 * time.Millisecond)
 
-		if len(n.Book.Asks) == 0 && len(n.Book.Bids) == 0 {
+		if len(n.BookCache.Asks) == 0 && len(n.BookCache.Bids) == 0 {
 			continue
 		}
 
@@ -59,8 +77,8 @@ func (n *Notification) StartLoop() {
 		config.Redis.SetKey("finex:"+n.Symbol+":depth:sequence", n.Sequence, redis.KeepTTL)
 
 		payload := DepthJSON{
-			Asks:     n.Book.Asks,
-			Bids:     n.Book.Bids,
+			Asks:     n.BookCache.Asks,
+			Bids:     n.BookCache.Bids,
 			Sequence: n.Sequence,
 		}
 
@@ -73,29 +91,49 @@ func (n *Notification) StartLoop() {
 			"depth":  payload,
 		})
 
-		mq_client.Enqueue("depth_cache", depth_cache_message)
+		config.Nats.Publish("depth_cache", depth_cache_message)
 
-		n.Book.Asks = [][]decimal.Decimal{}
-		n.Book.Bids = [][]decimal.Decimal{}
+		n.BookCache.Asks = [][]decimal.Decimal{}
+		n.BookCache.Bids = [][]decimal.Decimal{}
 	}
 }
 
 func (n *Notification) Publish(side Side, price, amount decimal.Decimal) {
 	if side == SideBuy {
+		for i, item := range n.BookCache.Bids {
+			if price.Equal(item[0]) {
+				n.BookCache.Bids = append(n.BookCache.Bids[:i], n.BookCache.Bids[i+1:]...)
+			}
+		}
+
+		n.BookCache.Bids = append(n.BookCache.Bids, []decimal.Decimal{price, amount})
+
 		for i, item := range n.Book.Bids {
 			if price.Equal(item[0]) {
-				n.Book.Bids = append(n.Book.Bids[:i], n.Book.Bids[i+1:]...)
+				n.BookCache.Bids = append(n.Book.Bids[:i], n.Book.Bids[i+1:]...)
 			}
 		}
 
-		n.Book.Bids = append(n.Book.Bids, []decimal.Decimal{price, amount})
+		if amount.IsPositive() {
+			n.Book.Bids = append(n.Book.Bids, []decimal.Decimal{price, amount})
+		}
 	} else {
+		for i, item := range n.BookCache.Asks {
+			if price.Equal(item[0]) {
+				n.BookCache.Asks = append(n.BookCache.Asks[:i], n.BookCache.Asks[i+1:]...)
+			}
+		}
+
+		n.BookCache.Asks = append(n.BookCache.Asks, []decimal.Decimal{price, amount})
+
 		for i, item := range n.Book.Asks {
 			if price.Equal(item[0]) {
-				n.Book.Asks = append(n.Book.Asks[:i], n.Book.Asks[i+1:]...)
+				n.BookCache.Asks = append(n.Book.Asks[:i], n.Book.Asks[i+1:]...)
 			}
 		}
 
-		n.Book.Asks = append(n.Book.Asks, []decimal.Decimal{price, amount})
+		if amount.IsPositive() {
+			n.Book.Asks = append(n.Book.Asks, []decimal.Decimal{price, amount})
+		}
 	}
 }
