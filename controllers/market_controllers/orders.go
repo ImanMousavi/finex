@@ -2,9 +2,11 @@ package market_controllers
 
 import (
 	"encoding/json"
+	"errors"
 	"time"
 
 	"github.com/gofiber/fiber/v2"
+	"gorm.io/gorm"
 
 	"github.com/zsmartex/go-finex/config"
 	"github.com/zsmartex/go-finex/controllers/auth"
@@ -151,9 +153,15 @@ func GetOrderByID(c *fiber.Ctx) error {
 		})
 	}
 
-	var order models.Order
+	var order *models.Order
 
-	config.DataBase.Where("id = ? AND member_id = ?", id, CurrentUser.ID).Find(&order)
+	result := config.DataBase.Where("id = ? AND member_id = ?", id, CurrentUser.ID).First(&order)
+
+	if errors.Is(result.Error, gorm.ErrRecordNotFound) {
+		return c.Status(404).JSON(helpers.Errors{
+			Errors: []string{"record.not_found"},
+		})
+	}
 
 	return c.Status(200).JSON(order.ToJSON())
 }
@@ -173,9 +181,15 @@ func CancelOrderByID(c *fiber.Ctx) error {
 		})
 	}
 
-	var order models.Order
+	var order *models.Order
 
-	config.DataBase.Where("id = ? AND member_id = ?", id, CurrentUser.ID).Find(&order)
+	result := config.DataBase.Where("id = ? AND member_id = ?", id, CurrentUser.ID).First(&order)
+
+	if errors.Is(result.Error, gorm.ErrRecordNotFound) {
+		return c.Status(404).JSON(helpers.Errors{
+			Errors: []string{"record.not_found"},
+		})
+	}
 
 	// Doing cancel
 	payload_matching_attrs, _ := json.Marshal(map[string]interface{}{
@@ -188,7 +202,7 @@ func CancelOrderByID(c *fiber.Ctx) error {
 }
 
 func CancelAllOrders(c *fiber.Ctx) error {
-	var orders []models.Order
+	var orders []*models.Order
 	params := new(queries.CancelOrderParams)
 
 	if err := c.BodyParser(params); err != nil {

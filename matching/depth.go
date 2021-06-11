@@ -1,6 +1,8 @@
 package matching
 
 import (
+	"sync"
+
 	rbt "github.com/emirpasic/gods/trees/redblacktree"
 	"github.com/shopspring/decimal"
 	log "github.com/sirupsen/logrus"
@@ -35,6 +37,7 @@ type Depth struct {
 	Asks         *rbt.Tree
 	Sequence     uint64
 	Notification *Notification
+	depthMutex   sync.RWMutex
 }
 
 // NewDepth returns a depth with specific scale.
@@ -49,6 +52,9 @@ func NewDepth(symbol string, notification *Notification) *Depth {
 
 // UpdatePriceLevel updates depth with price level.
 func (d *Depth) UpdatePriceLevel(side Side, price, quantity decimal.Decimal, count int32) {
+	d.depthMutex.Lock()
+	defer d.depthMutex.Unlock()
+
 	var priceLevels *rbt.Tree
 	pl := &PriceLevel{
 		Price:    price,

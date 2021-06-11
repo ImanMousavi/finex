@@ -2,12 +2,15 @@ package routes
 
 import (
 	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v2/middleware/logger"
+
 	"github.com/zsmartex/go-finex/controllers"
 	"github.com/zsmartex/go-finex/controllers/market_controllers"
 )
 
 func SetupRouter() *fiber.App {
 	app := fiber.New()
+	app.Use(logger.New())
 
 	app.Get("/api/v2/public/timestamp", controllers.GetTimestamp)
 	app.Get("/api/v2/public/global_price", controllers.GetGlobalPrice)

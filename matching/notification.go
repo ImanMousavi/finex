@@ -2,6 +2,7 @@ package matching
 
 import (
 	"encoding/json"
+	"sync"
 	"time"
 
 	"github.com/go-redis/redis/v8"
@@ -23,10 +24,11 @@ type Book struct {
 }
 
 type Notification struct {
-	Symbol    string // instrument name
-	Sequence  uint64
-	Book      *Book // cache for fetch depth
-	BookCache *Book // cache for notify to websocket
+	Symbol      string // instrument name
+	Sequence    uint64
+	Book        *Book // cache for fetch depth
+	BookCache   *Book // cache for notify to websocket
+	NotifyMutex sync.RWMutex
 }
 
 func NewNotification(symbol string) *Notification {
@@ -56,6 +58,7 @@ func (n *Notification) Start() {
 
 func (n *Notification) SubscribeFetch() {
 	config.Nats.Subscribe("depth:"+n.Symbol, func(m *nats.Msg) {
+		n.NotifyMutex.Lock()
 		asks_depth := make([][]decimal.Decimal, 0)
 		bids_depth := make([][]decimal.Decimal, 0)
 
@@ -73,6 +76,7 @@ func (n *Notification) SubscribeFetch() {
 		})
 
 		m.Respond(depth_message)
+		n.NotifyMutex.Unlock()
 	})
 }
 
@@ -83,6 +87,8 @@ func (n *Notification) StartLoop() {
 		if len(n.BookCache.Asks) == 0 && len(n.BookCache.Bids) == 0 {
 			continue
 		}
+
+		n.NotifyMutex.Lock()
 
 		n.Sequence++
 		config.Redis.SetKey("finex:"+n.Symbol+":depth:sequence", n.Sequence, redis.KeepTTL)
@@ -116,10 +122,13 @@ func (n *Notification) StartLoop() {
 
 		n.BookCache.Asks = make(map[decimal.Decimal]decimal.Decimal)
 		n.BookCache.Bids = make(map[decimal.Decimal]decimal.Decimal)
+		n.NotifyMutex.Unlock()
 	}
 }
 
 func (n *Notification) Publish(side Side, price, amount decimal.Decimal) {
+	n.NotifyMutex.Lock()
+	defer n.NotifyMutex.Unlock()
 	if side == SideBuy {
 		for bprice, _ := range n.BookCache.Bids {
 			if price.Equal(bprice) {
