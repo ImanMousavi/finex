@@ -7,7 +7,6 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/go-redis/redis/v8"
 	"github.com/zsmartex/go-finex/config"
 	"github.com/zsmartex/go-finex/types"
 )
