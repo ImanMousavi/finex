@@ -34,7 +34,7 @@ func (j *GlobalPriceJob) Process() {
 		return
 	}
 
-	config.Redis.SetKey("finex:h24:global_price", global_price, redis.KeepTTL)
+	config.Redis.SetKey("finex:h24:global_price", global_price, 0)
 
 	time.Sleep(10 * time.Minute)
 }
