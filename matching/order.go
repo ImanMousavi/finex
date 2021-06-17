@@ -5,7 +5,7 @@ import (
 
 	"github.com/emirpasic/gods/utils"
 	"github.com/shopspring/decimal"
-	log "github.com/sirupsen/logrus"
+	"github.com/zsmartex/go-finex/config"
 )
 
 // Side is the orders' side.
@@ -81,7 +81,7 @@ func (o *Order) IsMarket() bool {
 func (o *Order) Match(taker *Order) *Trade {
 	maker := o
 	if maker.Side == taker.Side {
-		log.Fatalf("[oceanbook.orderbook] match order with same side %s, %d, %d", maker.Side, maker.ID, taker.ID)
+		config.Logger.Errorf("[oceanbook.orderbook] match order with same side %s, %d, %d", maker.Side, maker.ID, taker.ID)
 		return nil
 	}
 
@@ -149,7 +149,7 @@ func Comparator(a, b interface{}) (result int) {
 	that := b.(*Key)
 
 	if this.Side != that.Side {
-		log.Fatalf("[oceanbook.orderbook] compare order with different sides")
+		config.Logger.Errorf("[oceanbook.orderbook] compare order with different sides")
 	}
 
 	if this.ID == that.ID {
@@ -192,7 +192,7 @@ func StopComparator(a, b interface{}) (result int) {
 	that := b.(*Key)
 
 	if this.Side != that.Side {
-		log.Fatalf("[oceanbook.orderbook] compare order with different sides")
+		config.Logger.Errorf("[oceanbook.orderbook] compare order with different sides")
 	}
 
 	if this.ID == that.ID {

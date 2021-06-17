@@ -2,11 +2,11 @@ package mq_client
 
 import (
 	"io/ioutil"
-	"log"
 	"os"
 	"reflect"
 
 	"github.com/streadway/amqp"
+	"github.com/zsmartex/go-finex/config"
 	"gopkg.in/yaml.v2"
 )
 
@@ -24,7 +24,7 @@ func CreateAMQP() (*amqp.Connection, error) {
 
 	connection, err := amqp.Dial("amqp://" + rabbitmq_username + ":" + rabbitmq_password + "@" + rabbitmq_host + ":" + rabbitmq_port)
 	if err != nil {
-		log.Println("AMQP: Failed to connect to amqp")
+		config.Logger.Error("AMQP: Failed to connect to AMQP")
 
 		return nil, err
 	}

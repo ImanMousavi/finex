@@ -1,8 +1,6 @@
 package mq_client
 
 import (
-	"log"
-
 	"github.com/streadway/amqp"
 )
 
@@ -24,12 +22,7 @@ func GetChannel() *amqp.Channel {
 	if AMQPChannel != nil {
 		return AMQPChannel
 	} else {
-		channel, err := Connection.Channel()
-
-		if err != nil {
-			log.Println("AMQP: Failed to get channel")
-			log.Panic(err)
-		}
+		channel, _ := Connection.Channel()
 
 		AMQPChannel = channel
 
@@ -43,7 +36,6 @@ func Publish(eid string, queue Queue, payload []byte, routing_key string) error 
 	err := GetChannel().ExchangeDeclare(exchangeName, exchangeKind, queue.Durable, false, false, false, nil)
 
 	if err != nil {
-		log.Println(err)
 		return err
 	}
 
@@ -74,14 +66,34 @@ func Enqueue(id string, payload []byte) {
 	Publish(eid, queue, payload, routing_key)
 }
 
-func EnqueueEvent(kind string, id string, event string, payload []byte) {
+func EnqueueEvent(kind string, id string, event string, payload []byte) error {
 	routing_key := kind + "." + id + "." + event
 
 	GetChannel().ExchangeDeclare("peatio.events.ranger", "topic", false, false, false, false, nil)
 
-	log.Printf("Publishing message to rango routing_key: %s\n", routing_key)
+	return GetChannel().Publish(
+		"peatio.events.ranger",
+		routing_key,
+		false,
+		false,
+		amqp.Publishing{
+			Headers:         amqp.Table{},
+			ContentType:     "application/json",
+			ContentEncoding: "",
+			Body:            payload,
+			DeliveryMode:    amqp.Persistent, // 1=non-persistent, 2=persistent
+			Priority:        0,               // 0-9
+			// a bunch of application/implementation-specific fields
+		},
+	)
+}
 
-	GetChannel().Publish(
+func ChanEnqueueEvent(channel *amqp.Channel, kind string, id string, event string, payload []byte) error {
+	routing_key := kind + "." + id + "." + event
+
+	channel.ExchangeDeclare("peatio.events.ranger", "topic", false, false, false, false, nil)
+
+	return channel.Publish(
 		"peatio.events.ranger",
 		routing_key,
 		false,

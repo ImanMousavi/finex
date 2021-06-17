@@ -2,7 +2,6 @@ package matching
 
 import (
 	"encoding/json"
-	"log"
 
 	"github.com/zsmartex/go-finex/config"
 )
@@ -32,7 +31,6 @@ func NewEngine(market string) *Engine {
 }
 
 func (e Engine) Submit(order *Order) error {
-	log.Printf("Submiting order_id: %v\n", order.ID)
 	trades := e.OrderBook.InsertOrder(order)
 
 	for _, trade := range trades {

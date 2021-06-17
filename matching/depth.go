@@ -5,7 +5,7 @@ import (
 
 	rbt "github.com/emirpasic/gods/trees/redblacktree"
 	"github.com/shopspring/decimal"
-	log "github.com/sirupsen/logrus"
+	"github.com/zsmartex/go-finex/config"
 )
 
 // PriceLevel .
@@ -66,12 +66,10 @@ func (d *Depth) UpdatePriceLevel(side Side, price, quantity decimal.Decimal, cou
 	switch pl.Side {
 	case SideSell:
 		priceLevels = d.Asks
-
 	case SideBuy:
 		priceLevels = d.Bids
-
 	default:
-		log.Fatalf("[depth] invalid price level side %s", pl.Side)
+		config.Logger.Errorf("[depth] invalid price level side %s", pl.Side)
 	}
 
 	foundPriceLevel, found := priceLevels.Get(pl.Key())

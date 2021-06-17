@@ -2,7 +2,6 @@ package engines
 
 import (
 	"encoding/json"
-	"log"
 
 	"github.com/zsmartex/go-finex/config"
 	"github.com/zsmartex/go-finex/matching"
@@ -31,9 +30,8 @@ func NewMatchingWorker() *MatchingWorker {
 
 func (w MatchingWorker) Process(payload []byte) error {
 	var matching_payload MatchingPayloadMessage
-	err := json.Unmarshal(payload, &matching_payload)
-	if err != nil {
-		log.Print(err)
+	if err := json.Unmarshal(payload, &matching_payload); err != nil {
+		return err
 	}
 
 	switch matching_payload.Action {
@@ -46,7 +44,7 @@ func (w MatchingWorker) Process(payload []byte) error {
 	case matching.ActionReload:
 		w.Reload(matching_payload.Market)
 	default:
-		log.Fatalf("Unknown action: %s", matching_payload.Action)
+		config.Logger.Fatalf("Unknown action: %s", matching_payload.Action)
 	}
 
 	return nil
@@ -82,7 +80,7 @@ func (w MatchingWorker) Reload(market string) {
 		for _, market := range markets {
 			w.InitializeEngine(market.ID)
 		}
-		log.Println("All engines reloaded.")
+		config.Logger.Info("All engines reloaded.")
 	} else {
 		w.InitializeEngine(market)
 	}
@@ -91,7 +89,7 @@ func (w MatchingWorker) Reload(market string) {
 func (w MatchingWorker) InitializeEngine(market string) {
 	w.AddNewEngine(market)
 	w.LoadOrders(market)
-	log.Printf("%v engine reloaded.\n", market)
+	config.Logger.Infof("%v engine reloaded.\n", market)
 }
 
 func (w MatchingWorker) BuildOrder(order map[string]interface{}) *matching.Order {

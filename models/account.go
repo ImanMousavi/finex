@@ -2,8 +2,7 @@ package models
 
 import (
 	"encoding/json"
-	"errors"
-	"strconv"
+	"fmt"
 	"time"
 
 	"github.com/shopspring/decimal"
@@ -63,7 +62,7 @@ func (a *Account) TriggerEvent() {
 
 func (a *Account) PlusFunds(tx *gorm.DB, amount decimal.Decimal) error {
 	if !amount.IsPositive() {
-		return errors.New("Cannot add funds (member id: " + strconv.FormatUint(a.MemberID, 10) + ", currency id: " + string(a.CurrencyID) + ", amount: " + amount.String() + ", balance: " + a.Balance.String() + ").")
+		return fmt.Errorf("cannot add funds (member id: %d, currency id: %s, amount: %s, balance: %s)", a.MemberID, a.CurrencyID, amount.String(), a.Balance.String())
 	}
 
 	a.Balance = a.Balance.Add(amount)
@@ -72,7 +71,7 @@ func (a *Account) PlusFunds(tx *gorm.DB, amount decimal.Decimal) error {
 
 func (a *Account) PlusLockedFunds(tx *gorm.DB, amount decimal.Decimal) error {
 	if !amount.IsPositive() {
-		return errors.New("Cannot add funds (member id: " + strconv.FormatUint(a.MemberID, 10) + ", currency id: " + string(a.CurrencyID) + ", amount: " + amount.String() + ", locked: " + a.Locked.String() + ").")
+		return fmt.Errorf("cannot add funds (member id: %d, currency id: %s, amount: %s, locked: %s)", a.MemberID, a.CurrencyID, amount.String(), a.Locked.String())
 	}
 
 	a.Locked = a.Locked.Add(amount)
@@ -81,7 +80,7 @@ func (a *Account) PlusLockedFunds(tx *gorm.DB, amount decimal.Decimal) error {
 
 func (a *Account) SubFunds(tx *gorm.DB, amount decimal.Decimal) error {
 	if !amount.IsPositive() || amount.GreaterThan(a.Balance) {
-		return errors.New("Cannot subtract funds (member id: " + strconv.FormatUint(a.MemberID, 10) + ", currency id: " + string(a.CurrencyID) + ", amount: " + amount.String() + ", balance: " + a.Balance.String() + ").")
+		return fmt.Errorf("cannot subtract funds (member id: %d, currency id: %s, amount: %s, balance: %s)", a.MemberID, a.CurrencyID, amount.String(), a.Balance.String())
 	}
 
 	a.Balance = a.Balance.Sub(amount)
@@ -90,7 +89,7 @@ func (a *Account) SubFunds(tx *gorm.DB, amount decimal.Decimal) error {
 
 func (a *Account) LockFunds(tx *gorm.DB, amount decimal.Decimal) error {
 	if !amount.IsPositive() || amount.GreaterThan(a.Balance) {
-		return errors.New("Cannot lock funds (member id: " + strconv.FormatUint(a.MemberID, 10) + ", currency id: " + string(a.CurrencyID) + ", amount: " + amount.String() + ", balance: " + a.Balance.String() + ", locked: " + a.Locked.String() + ").")
+		return fmt.Errorf("cannot lock funds (member id: %d, currency id: %s, amount: %s, balance: %s, locked: %s)", a.MemberID, a.CurrencyID, amount.String(), a.Balance.String(), a.Locked.String())
 	}
 
 	a.Balance = a.Balance.Sub(amount)
@@ -100,7 +99,7 @@ func (a *Account) LockFunds(tx *gorm.DB, amount decimal.Decimal) error {
 
 func (a *Account) UnlockFunds(tx *gorm.DB, amount decimal.Decimal) error {
 	if !amount.IsPositive() || amount.GreaterThan(a.Locked) {
-		return errors.New("Cannot unlock funds (member id: " + strconv.FormatUint(a.MemberID, 10) + ", currency id: " + string(a.CurrencyID) + ", amount: " + amount.String() + ", balance: " + a.Balance.String() + ", locked: " + a.Locked.String() + ").")
+		return fmt.Errorf("cannot unlock funds (member id: %d, currency id: %s, amount: %s, balance: %s, locked: %s)", a.MemberID, a.CurrencyID, amount.String(), a.Balance.String(), a.Locked.String())
 	}
 
 	a.Balance = a.Balance.Add(amount)
@@ -110,7 +109,7 @@ func (a *Account) UnlockFunds(tx *gorm.DB, amount decimal.Decimal) error {
 
 func (a *Account) UnlockAndSubFunds(tx *gorm.DB, amount decimal.Decimal) error {
 	if !amount.IsPositive() || amount.GreaterThan(a.Locked) {
-		return errors.New("Cannot unlock funds (member id: " + strconv.FormatUint(a.MemberID, 10) + ", currency id: " + string(a.CurrencyID) + ", amount: " + amount.String() + ", locked: " + a.Locked.String() + ").")
+		return fmt.Errorf("cannot unlock and sub funds (member id: %d, currency id: %s, amount: %s, balance: %s, locked: %s)", a.MemberID, a.CurrencyID, amount.String(), a.Balance.String(), a.Locked.String())
 	}
 
 	a.Locked = a.Locked.Sub(amount)

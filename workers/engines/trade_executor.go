@@ -2,8 +2,7 @@ package engines
 
 import (
 	"encoding/json"
-	"errors"
-	"log"
+	"fmt"
 	"strconv"
 
 	"github.com/shopspring/decimal"
@@ -32,16 +31,17 @@ func (w *TradeExecutorWorker) Process(payload []byte) error {
 	trade_executor := &TradeExecutor{}
 
 	if err := json.Unmarshal(payload, &trade_executor.TradePayload); err != nil {
-		log.Print(err)
 		return err
 	}
 
 	trade, err := trade_executor.CreateTradeAndStrikeOrders()
 
 	if err != nil {
-		log.Println(err.Error())
-
 		for _, order := range []*models.Order{trade_executor.MakerOrder, trade_executor.TakerOrder} {
+			if order.State != models.StateWait {
+				continue
+			}
+
 			matching_payload_message, err := json.Marshal(map[string]interface{}{
 				"action": matching.ActionSubmit,
 				"order":  order.ToMatchingAttributes(),
@@ -73,15 +73,15 @@ func (t *TradeExecutor) VaildateTrade() error {
 	}
 
 	if ask_order.OrdType == types.TypeLimit && ask_order.Price.Decimal.GreaterThan(t.TradePayload.Price) {
-		return errors.New("ask price exceeds strike price")
+		return fmt.Errorf("ask price exceeds strike price")
 	} else if bid_order.OrdType == types.TypeLimit && bid_order.Price.Decimal.LessThan(t.TradePayload.Price) {
-		return errors.New("bid price is less than strike price")
+		return fmt.Errorf("bid price is less than strike price")
 	} else if t.MakerOrder.State != models.StateWait {
-		return errors.New("Maker order state isn't equal to «wait» (" + string(t.MakerOrder.State) + ").")
+		return fmt.Errorf("maker order state isn't equal to «wait» (%v)", t.MakerOrder.State)
 	} else if t.TakerOrder.State != models.StateWait {
-		return errors.New("Taker order state isn't equal to «wait» (" + string(t.TakerOrder.State) + ").")
+		return fmt.Errorf("taker order state isn't equal to «wait» (%v)", t.TakerOrder.State)
 	} else if !t.TradePayload.Total.IsPositive() || decimal.Min(t.MakerOrder.Volume, t.TakerOrder.Volume).LessThan(t.TradePayload.Quantity) {
-		return errors.New("not enough funds")
+		return fmt.Errorf("not enough funds")
 	}
 
 	return nil

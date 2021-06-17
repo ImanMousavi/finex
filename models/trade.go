@@ -136,7 +136,7 @@ func (t *Trade) WriteToInflux() {
 		"amount":     amount,
 		"total":      total,
 		"taker_type": t.TakerType,
-		"created_at": t.CreatedAt.Unix(),
+		"created_at": t.CreatedAt,
 	}
 
 	config.InfluxDB.NewPoint("trades", tags, fields)
@@ -270,23 +270,27 @@ func (t *Trade) ToJSON(member *Member) entities.TradeEntities {
 }
 
 type TradeGlobalJSON struct {
-	ID        uint64          `json:"id"`
-	Market    string          `json:"market"`
-	Price     decimal.Decimal `json:"price"`
-	Amount    decimal.Decimal `json:"amount"`
-	Total     decimal.Decimal `json:"total"`
-	TakerType types.TakerType `json:"taker_type"`
-	CreatedAt time.Time       `json:"created_at"`
+	ID           uint64          `json:"id"`
+	Market       string          `json:"market"`
+	Price        decimal.Decimal `json:"price"`
+	Amount       decimal.Decimal `json:"amount"`
+	Total        decimal.Decimal `json:"total"`
+	MakerOrderID uint64          `json:"maker_order_id"`
+	TakerOrderID uint64          `json:"taker_order_id"`
+	TakerType    types.TakerType `json:"taker_type"`
+	CreatedAt    time.Time       `json:"created_at"`
 }
 
 func (t *Trade) TradeGlobalJSON() TradeGlobalJSON {
 	return TradeGlobalJSON{
-		ID:        t.ID,
-		Market:    t.MarketID,
-		Price:     t.Price,
-		Amount:    t.Amount,
-		Total:     t.Total,
-		TakerType: t.TakerType,
-		CreatedAt: t.CreatedAt,
+		ID:           t.ID,
+		Market:       t.MarketID,
+		Price:        t.Price,
+		Amount:       t.Amount,
+		Total:        t.Total,
+		MakerOrderID: t.MakerOrderID,
+		TakerOrderID: t.TakerOrderID,
+		TakerType:    t.TakerType,
+		CreatedAt:    t.CreatedAt,
 	}
 }

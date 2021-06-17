@@ -1,7 +1,6 @@
 package config
 
 import (
-	"log"
 	"os"
 	"time"
 
@@ -41,22 +40,20 @@ func (c *InfluxClient) NewPoint(name string, tags map[string]string, fields map[
 	bp, err := c.NewBatchPoints()
 
 	if err != nil {
-		log.Println("Failed to create new batch point", err.Error())
+		Logger.Errorf("Failed to create new batch point %v", err.Error())
 	}
 
 	point, err := client.NewPoint(name, tags, fields, time.Now())
 	if err != nil {
-		log.Println("Error: ", err.Error())
+		Logger.Errorf("Error %v", err.Error())
 	}
-
-	log.Println("Writing point to influxdb")
 
 	bp.AddPoint(point)
 
 	// Write the batch
 	err = c.client.Write(bp)
 	if err != nil {
-		log.Println("Error: ", err.Error())
+		Logger.Errorf("Error %v", err.Error())
 	}
 }
 

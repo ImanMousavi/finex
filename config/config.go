@@ -1,6 +1,7 @@
 package config
 
 func InitializeConfig() error {
+	NewLoggerService()
 	if err := ConnectDatabase(); err != nil {
 		return err
 	}

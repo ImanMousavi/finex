@@ -2,7 +2,6 @@ package engines
 
 import (
 	"encoding/json"
-	"log"
 
 	"github.com/zsmartex/go-finex/config"
 	"github.com/zsmartex/go-finex/matching"
@@ -24,7 +23,7 @@ func NewOrderProcessorWorker() *OrderProcessorWorker {
 	config.DataBase.Where("state = ?", models.StatePending).Find(&orders)
 	for _, order := range orders {
 		if err := models.SubmitOrder(order.ID); err != nil {
-			log.Println(err.Error())
+			config.Logger.Errorf("Error: %s", err.Error())
 			break
 		}
 	}
@@ -37,7 +36,6 @@ func (w OrderProcessorWorker) Process(payload []byte) error {
 	err := json.Unmarshal(payload, &order_processor_payload)
 
 	if err != nil {
-		log.Print(err)
 		return err
 	}
 
@@ -51,7 +49,6 @@ func (w OrderProcessorWorker) Process(payload []byte) error {
 	}
 
 	if err != nil {
-		log.Print(err)
 		return err
 	}
 

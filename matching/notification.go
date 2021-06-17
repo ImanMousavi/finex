@@ -69,11 +69,15 @@ func (n *Notification) SubscribeFetch() {
 			bids_depth = append(bids_depth, []decimal.Decimal{price, amount})
 		}
 
-		depth_message, _ := json.Marshal(DepthJSON{
+		depth_message, err := json.Marshal(DepthJSON{
 			Asks:     asks_depth,
 			Bids:     bids_depth,
 			Sequence: n.Sequence,
 		})
+
+		if err != nil {
+			config.Logger.Errorf("Error: %s", err.Error())
+		}
 
 		m.Respond(depth_message)
 		n.NotifyMutex.Unlock()
@@ -81,6 +85,16 @@ func (n *Notification) SubscribeFetch() {
 }
 
 func (n *Notification) StartLoop() {
+	amqp_connection, err := mq_client.CreateAMQP()
+	if err != nil {
+		return
+	}
+
+	channel, err := amqp_connection.Channel()
+	if err != nil {
+		return
+	}
+
 	for {
 		time.Sleep(100 * time.Millisecond)
 
@@ -109,16 +123,15 @@ func (n *Notification) StartLoop() {
 			Sequence: n.Sequence,
 		}
 
-		payload_message, _ := json.Marshal(payload)
+		payload_message, err := json.Marshal(payload)
 
-		mq_client.EnqueueEvent("public", n.Symbol, "depth", payload_message)
+		if err != nil {
+			config.Logger.Errorf("Error: %s", err.Error())
+		}
 
-		depth_cache_message, _ := json.Marshal(map[string]interface{}{
-			"market": n.Symbol,
-			"depth":  payload,
-		})
-
-		config.Nats.Publish("depth_cache", depth_cache_message)
+		if err := mq_client.ChanEnqueueEvent(channel, "public", n.Symbol, "depth", payload_message); err != nil {
+			config.Logger.Errorf("Error: %s", err.Error())
+		}
 
 		n.BookCache.Asks = make(map[decimal.Decimal]decimal.Decimal)
 		n.BookCache.Bids = make(map[decimal.Decimal]decimal.Decimal)
@@ -129,8 +142,9 @@ func (n *Notification) StartLoop() {
 func (n *Notification) Publish(side Side, price, amount decimal.Decimal) {
 	n.NotifyMutex.Lock()
 	defer n.NotifyMutex.Unlock()
+
 	if side == SideBuy {
-		for bprice, _ := range n.BookCache.Bids {
+		for bprice := range n.BookCache.Bids {
 			if price.Equal(bprice) {
 				delete(n.BookCache.Bids, bprice)
 			}
@@ -138,7 +152,7 @@ func (n *Notification) Publish(side Side, price, amount decimal.Decimal) {
 
 		n.BookCache.Bids[price] = amount
 
-		for bprice, _ := range n.Book.Bids {
+		for bprice := range n.Book.Bids {
 			if price.Equal(bprice) {
 				delete(n.Book.Bids, bprice)
 			}
@@ -148,7 +162,7 @@ func (n *Notification) Publish(side Side, price, amount decimal.Decimal) {
 			n.Book.Bids[price] = amount
 		}
 	} else {
-		for bprice, _ := range n.BookCache.Asks {
+		for bprice := range n.BookCache.Asks {
 			if price.Equal(bprice) {
 				delete(n.BookCache.Asks, bprice)
 			}
@@ -156,7 +170,7 @@ func (n *Notification) Publish(side Side, price, amount decimal.Decimal) {
 
 		n.BookCache.Asks[price] = amount
 
-		for bprice, _ := range n.Book.Asks {
+		for bprice := range n.Book.Asks {
 			if price.Equal(bprice) {
 				delete(n.Book.Asks, bprice)
 			}

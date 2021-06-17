@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"log"
 	"os"
 	"time"
 
@@ -56,11 +55,11 @@ func main() {
 		routing_key := mq_client.GetRoutingKey(id)
 
 		if err := Channel.ExchangeDeclare(exchange_name, exchange_kind, binding_queue.Durable, false, false, false, nil); err != nil {
-			log.Fatalf("Exchange Declare: %v\n", err)
+			config.Logger.Errorf("Exchange Declare: %v\n", err)
 			return
 		}
 		if _, err := Channel.QueueDeclare(binding_queue.Name, binding_queue.Durable, false, false, false, nil); err != nil {
-			log.Fatalf("Queue Declare: %v\n", err)
+			config.Logger.Errorf("Queue Declare: %v\n", err)
 			return
 		}
 		Channel.QueueBind(binding_queue.Name, routing_key, exchange_name, false, nil)
@@ -74,8 +73,9 @@ func main() {
 				continue
 			}
 
-			log.Printf("Receive message: %s\n", string(m.Data))
+			config.Logger.Debugf("Receive message: %s", string(m.Data))
 			if err := worker.Process(m.Data); err == nil {
+				config.Logger.Errorf("Worker error: %v", err.Error())
 				m.Ack()
 			}
 		}

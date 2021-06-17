@@ -2,7 +2,6 @@ package controllers
 
 import (
 	"encoding/json"
-	"log"
 	"time"
 
 	"github.com/gofiber/fiber/v2"
@@ -47,7 +46,7 @@ func GetGlobalPrice(c *fiber.Ctx) error {
 	var global_price types.GlobalPrice
 
 	if err := config.Redis.GetKey("finex:h24:global_price", &global_price); err != nil {
-		log.Fatalln(err)
+		config.Logger.Errorf("Error %v", err.Error())
 		c.Status(422).JSON(helpers.Errors{
 			Errors: []string{"public.global_price.failed"},
 		})

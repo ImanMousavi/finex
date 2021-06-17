@@ -90,6 +90,8 @@ func (p CreateOrderParams) BuildOrder(member *models.Member, err_src *Errors) *m
 		p.OrdType = types.TypeLimit
 	}
 
+	trading_fee := models.TradingFeeFor(member.Group, market.ID)
+
 	order := &models.Order{
 		MemberID:     member.ID,
 		Ask:          market.BaseUnit,
@@ -101,6 +103,8 @@ func (p CreateOrderParams) BuildOrder(member *models.Member, err_src *Errors) *m
 		Price:        p.Price,
 		StopPrice:    p.StopPrice,
 		Volume:       p.Volume,
+		MakerFee:     trading_fee.Maker,
+		TakerFee:     trading_fee.Taker,
 		OriginVolume: p.Volume,
 	}
 

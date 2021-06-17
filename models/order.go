@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"strconv"
 	"time"
 
@@ -191,10 +192,10 @@ func SubmitOrder(id uint64) error {
 	var order *Order
 
 	err := config.DataBase.Transaction(func(tx *gorm.DB) error {
-		tx.Clauses(clause.Locking{Strength: "UPDATE", Table: clause.Table{Name: "orders"}}).Where("id = ?", id).First(&order)
+		result := tx.Clauses(clause.Locking{Strength: "UPDATE", Table: clause.Table{Name: "orders"}}).Where("id = ?", id).First(&order)
 
-		if order == nil {
-			return errors.New("Can't find order by id : " + strconv.FormatUint(order.ID, 10))
+		if errors.Is(result.Error, gorm.ErrRecordNotFound) {
+			return fmt.Errorf("can't find order by id : %d", order.ID)
 		}
 
 		if order.State != StatePending {
@@ -217,13 +218,14 @@ func SubmitOrder(id uint64) error {
 	})
 
 	if err != nil {
-		config.DataBase.Where("id = ?", id).First(&order)
-		if order != nil {
-			order.State = StateReject
-			config.DataBase.Save(&order)
+		result := config.DataBase.Where("id = ?", id).First(&order)
+
+		if errors.Is(result.Error, gorm.ErrRecordNotFound) {
+			return err
 		}
 
-		return err
+		order.State = StateReject
+		config.DataBase.Save(&order)
 	}
 
 	return nil
@@ -233,10 +235,10 @@ func CancelOrder(id uint64) error {
 	var order *Order
 
 	err := config.DataBase.Transaction(func(tx *gorm.DB) error {
-		tx.Clauses(clause.Locking{Strength: "UPDATE", Table: clause.Table{Name: "orders"}}).Where("id = ?", id).First(&order)
+		result := tx.Clauses(clause.Locking{Strength: "UPDATE", Table: clause.Table{Name: "orders"}}).Where("id = ?", id).First(&order)
 
-		if order == nil {
-			return errors.New("Can't find order by id : " + string(rune(order.ID)))
+		if errors.Is(result.Error, gorm.ErrRecordNotFound) {
+			return fmt.Errorf("can't find order by id : %d", order.ID)
 		}
 
 		if order.State != StateWait {

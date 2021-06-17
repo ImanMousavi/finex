@@ -6,7 +6,7 @@ import (
 	// log level and settings
 	rbt "github.com/emirpasic/gods/trees/redblacktree"
 	"github.com/shopspring/decimal"
-	log "github.com/sirupsen/logrus"
+	"github.com/zsmartex/go-finex/config"
 )
 
 // OrderBook is the order book.
@@ -56,7 +56,7 @@ func (od *OrderBook) InsertOrder(newOrder *Order) []*Trade {
 	od.Lock()
 	defer od.Unlock()
 
-	log.Debugf("[oceanbook.orderbook] insert order with id %d - %s * %s, side %s", newOrder.ID, newOrder.Price, newOrder.Quantity, newOrder.Side)
+	config.Logger.Debugf("[oceanbook.orderbook] insert order with id %d - %s * %s, side %s", newOrder.ID, newOrder.Price, newOrder.Quantity, newOrder.Side)
 
 	if newOrder.StopPrice.Valid {
 		od.insertStopOrder(newOrder)
@@ -70,7 +70,7 @@ func (od *OrderBook) InsertOrder(newOrder *Order) []*Trade {
 	for i := range pendingOrders {
 		pendingOrder := pendingOrders[i]
 
-		log.Debugf("[oceanbook.orderbook] insert stop order with id %d - %s * %s, side %s", pendingOrder.ID, pendingOrder.Price, pendingOrder.Quantity, pendingOrder.Side)
+		config.Logger.Debugf("[oceanbook.orderbook] insert stop order with id %d - %s * %s, side %s", pendingOrder.ID, pendingOrder.Price, pendingOrder.Quantity, pendingOrder.Side)
 
 		newTrades := od.insertOrder(pendingOrder)
 		trades = append(trades, newTrades...)
@@ -88,13 +88,11 @@ func (od *OrderBook) insertOrder(newOrder *Order) []*Trade {
 	case SideSell:
 		takerBooks = od.Asks
 		makerBooks = od.Bids
-
 	case SideBuy:
 		takerBooks = od.Bids
 		makerBooks = od.Asks
-
 	default:
-		log.Fatalf("[oceanbook.orderbook] invalid order side %s", newOrder.Side)
+		config.Logger.Errorf("[oceanbook.orderbook] invalid order side %s", newOrder.Side)
 		return trades
 	}
 
@@ -123,7 +121,7 @@ func (od *OrderBook) insertOrder(newOrder *Order) []*Trade {
 		od.tradeBook.Enter(newTrade)
 
 		trades = append(trades, newTrade)
-		log.Debugf("[oceanbook.orderbook] new trade with price %s", newTrade.Price)
+		config.Logger.Debugf("[oceanbook.orderbook] new trade with price %s", newTrade.Price)
 
 		var count int32
 		if bestOrder.Filled() {
@@ -179,7 +177,7 @@ func (od *OrderBook) insertStopOrder(newOrder *Order) {
 		takerBooks = od.StopBids
 
 	default:
-		log.Fatalf("[oceanbook.orderbook] invalid stop order side %s", newOrder.Side)
+		config.Logger.Errorf("[oceanbook.orderbook] invalid stop order side %s", newOrder.Side)
 		return
 	}
 
@@ -213,7 +211,7 @@ func (od *OrderBook) setMarketPrice(newPrice decimal.Decimal) {
 				break
 			}
 
-			log.Debugf("[oceanbook.orderbook] bid order %d with stop price %s enqueued", bestOrder.ID, bestOrder.Price)
+			config.Logger.Debugf("[oceanbook.orderbook] bid order %d with stop price %s enqueued", bestOrder.ID, bestOrder.Price)
 
 			od.StopBids.Remove(best.Key)
 			od.pendingOrdersQueue.Push(bestOrder)
@@ -232,7 +230,7 @@ func (od *OrderBook) setMarketPrice(newPrice decimal.Decimal) {
 				break
 			}
 
-			log.Debugf("[oceanbook.orderbook] ask order %d with stop price %s enqueued", bestOrder.ID, bestOrder.Price)
+			config.Logger.Debugf("[oceanbook.orderbook] ask order %d with stop price %s enqueued", bestOrder.ID, bestOrder.Price)
 
 			od.StopAsks.Remove(best.Key)
 			od.pendingOrdersQueue.Push(bestOrder)
