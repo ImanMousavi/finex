@@ -75,8 +75,9 @@ func main() {
 
 			config.Logger.Debugf("Receive message: %s", string(m.Data))
 			if err := worker.Process(m.Data); err == nil {
-				config.Logger.Errorf("Worker error: %v", err.Error())
 				m.Ack()
+			} else {
+				config.Logger.Errorf("Worker error: %v", err.Error())
 			}
 		}
 
