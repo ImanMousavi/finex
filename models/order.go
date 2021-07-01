@@ -409,7 +409,13 @@ func (o *Order) ComputeLocked() (decimal.Decimal, error) {
 		required_funds := decimal.Zero
 		expected_volume := o.Volume
 
-		price_levels := GetDepth(o.Type, o.MarketID)
+		var price_levels [][]decimal.Decimal
+		if o.Type == SideBuy {
+			price_levels = GetDepth(SideSell, o.MarketID)
+		} else {
+			price_levels = GetDepth(SideBuy, o.MarketID)
+		}
+
 		for !expected_volume.IsZero() && len(price_levels) != 0 {
 			i := len(price_levels) - 1
 			pl := price_levels[i]
