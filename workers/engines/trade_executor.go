@@ -28,7 +28,10 @@ func NewTradeExecutorWorker() *TradeExecutorWorker {
 }
 
 func (w *TradeExecutorWorker) Process(payload []byte) error {
-	trade_executor := &TradeExecutor{}
+	trade_executor := &TradeExecutor{
+		MakerOrder: &models.Order{},
+		TakerOrder: &models.Order{},
+	}
 
 	if err := json.Unmarshal(payload, &trade_executor.TradePayload); err != nil {
 		return err
@@ -91,7 +94,7 @@ func (t *TradeExecutor) CreateTradeAndStrikeOrders() (*models.Trade, error) {
 	var trade *models.Trade
 
 	err := config.DataBase.Transaction(func(tx *gorm.DB) error {
-		var _accounts []*models.Account
+		var accounts []*models.Account
 		var market *models.Market
 		accounts_table := make(map[string]*models.Account)
 
@@ -100,11 +103,11 @@ func (t *TradeExecutor) CreateTradeAndStrikeOrders() (*models.Trade, error) {
 		tx.Clauses(clause.Locking{
 			Strength: "UPDATE",
 			Table:    clause.Table{Name: "orders"},
-		}).Where("id = ?", t.TradePayload.MakerOrderID).First(&t.MakerOrder)
+		}).Where("id = ?", t.TradePayload.MakerOrderID).First(t.MakerOrder)
 		tx.Clauses(clause.Locking{
 			Strength: "UPDATE",
 			Table:    clause.Table{Name: "orders"},
-		}).Where("id = ?", t.TradePayload.TakerOrderID).First(&t.TakerOrder)
+		}).Where("id = ?", t.TradePayload.TakerOrderID).First(t.TakerOrder)
 
 		if err := t.VaildateTrade(); err != nil {
 			return err
@@ -113,9 +116,9 @@ func (t *TradeExecutor) CreateTradeAndStrikeOrders() (*models.Trade, error) {
 		tx.Clauses(clause.Locking{
 			Strength: "UPDATE",
 			Table:    clause.Table{Name: "accounts"},
-		}).Where("member_id IN ? AND currency_id IN ?", []uint64{t.MakerOrder.MemberID, t.MakerOrder.MemberID}, []string{market.BaseUnit, market.QuoteUnit}).Find(&_accounts)
+		}).Where("member_id IN ? AND currency_id IN ?", []uint64{t.MakerOrder.MemberID, t.MakerOrder.MemberID}, []string{market.BaseUnit, market.QuoteUnit}).Find(&accounts)
 
-		for _, account := range _accounts {
+		for _, account := range accounts {
 			accounts_table[account.CurrencyID+":"+strconv.FormatUint(account.MemberID, 10)] = account
 		}
 
@@ -130,7 +133,7 @@ func (t *TradeExecutor) CreateTradeAndStrikeOrders() (*models.Trade, error) {
 			TakerID:      t.TradePayload.TakerID,
 			TakerType:    t.TakerOrder.Side(),
 		}
-		config.DataBase.Create(&trade)
+		config.DataBase.Create(trade)
 
 		if err := t.Strike(
 			trade,
@@ -151,8 +154,8 @@ func (t *TradeExecutor) CreateTradeAndStrikeOrders() (*models.Trade, error) {
 			return err
 		}
 
-		tx.Save(&t.MakerOrder)
-		tx.Save(&t.TakerOrder)
+		tx.Save(t.MakerOrder)
+		tx.Save(t.TakerOrder)
 
 		trade.RecordCompleteOperations()
 

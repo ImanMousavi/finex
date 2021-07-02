@@ -1,8 +1,6 @@
 package matching
 
 import (
-	"time"
-
 	"github.com/shopspring/decimal"
 )
 
@@ -17,5 +15,4 @@ type Trade struct {
 	TakerOrderID uint64          `json:"taker_order_id"`
 	MakerID      uint64          `json:"maker_id"`
 	TakerID      uint64          `json:"taker_id"`
-	CreatedAt    time.Time       `json:"created_at"`
 }

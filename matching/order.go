@@ -21,25 +21,25 @@ const (
 
 // Order .
 type Order struct {
-	ID                uint64              `json:"id"`
-	Symbol            string              `json:"symbol"`
-	MemberID          uint64              `json:"member_id"`
-	Side              Side                `json:"side"`
-	Price             decimal.NullDecimal `json:"price"`
-	StopPrice         decimal.NullDecimal `json:"stop_price"`
-	Quantity          decimal.Decimal     `json:"quantity"`
-	FilledQuantity    decimal.Decimal     `json:"filled_quantity"`
-	ImmediateOrCancel bool                `json:"immediate_or_cancel"`
-	CreatedAt         time.Time           `json:"created_at"`
+	ID                uint64          `json:"id"`
+	Symbol            string          `json:"symbol"`
+	MemberID          uint64          `json:"member_id"`
+	Side              Side            `json:"side"`
+	Price             decimal.Decimal `json:"price"`
+	StopPrice         decimal.Decimal `json:"stop_price"`
+	Quantity          decimal.Decimal `json:"quantity"`
+	FilledQuantity    decimal.Decimal `json:"filled_quantity"`
+	ImmediateOrCancel bool            `json:"immediate_or_cancel"`
+	CreatedAt         time.Time       `json:"created_at"`
 }
 
 // Key is used to sort orders in red black tree.
 type Key struct {
-	ID        uint64              `json:"id"`
-	Side      Side                `json:"side"`
-	Price     decimal.NullDecimal `json:"price"`
-	StopPrice decimal.NullDecimal `json:"stop_price"`
-	CreatedAt time.Time           `json:"created_at"`
+	ID        uint64          `json:"id"`
+	Side      Side            `json:"side"`
+	Price     decimal.Decimal `json:"price"`
+	StopPrice decimal.Decimal `json:"stop_price"`
+	CreatedAt time.Time       `json:"created_at"`
 }
 
 // Key returns a Key.
@@ -69,12 +69,12 @@ func (o *Order) Fill(quantity decimal.Decimal) {
 
 // IsLimit returns true when the order is limit order.
 func (o *Order) IsLimit() bool {
-	return o.Price.Valid
+	return o.Price.IsPositive()
 }
 
 // IsMarket returns true when the order is market order.
 func (o *Order) IsMarket() bool {
-	return !o.Price.Valid
+	return o.Price.IsZero()
 }
 
 // Match matches maker with a taker and returns trade if there is a match.
@@ -100,22 +100,21 @@ func (o *Order) Match(taker *Order) *Trade {
 
 	switch {
 	case taker.IsLimit():
-		if bidOrder.Price.Decimal.GreaterThanOrEqual(askOrder.Price.Decimal) {
+		if bidOrder.Price.GreaterThanOrEqual(askOrder.Price) {
 			filledQuantity := decimal.Min(bidOrder.PendingQuantity(), askOrder.PendingQuantity())
-			total := filledQuantity.Mul(maker.Price.Decimal)
+			total := filledQuantity.Mul(maker.Price)
 			bidOrder.Fill(filledQuantity)
 			askOrder.Fill(filledQuantity)
 
 			return &Trade{
 				Symbol:       o.Symbol,
-				Price:        maker.Price.Decimal,
+				Price:        maker.Price,
 				Quantity:     filledQuantity,
 				Total:        total,
 				MakerOrderID: maker.ID,
 				TakerOrderID: taker.ID,
 				MakerID:      maker.MemberID,
 				TakerID:      taker.MemberID,
-				CreatedAt:    time.Now(),
 			}
 		}
 
@@ -123,20 +122,19 @@ func (o *Order) Match(taker *Order) *Trade {
 
 	case taker.IsMarket():
 		filledQuantity := decimal.Min(bidOrder.PendingQuantity(), askOrder.PendingQuantity())
-		total := filledQuantity.Mul(maker.Price.Decimal)
+		total := filledQuantity.Mul(maker.Price)
 		bidOrder.Fill(filledQuantity)
 		askOrder.Fill(filledQuantity)
 
 		return &Trade{
 			Symbol:       o.Symbol,
-			Price:        maker.Price.Decimal,
+			Price:        maker.Price,
 			Quantity:     filledQuantity,
 			Total:        total,
 			MakerOrderID: maker.ID,
 			TakerOrderID: taker.ID,
 			MakerID:      maker.MemberID,
 			TakerID:      taker.MemberID,
-			CreatedAt:    time.Now(),
 		}
 	}
 
@@ -158,16 +156,16 @@ func Comparator(a, b interface{}) (result int) {
 
 	// based on ask
 	switch {
-	case this.Side == SideSell && this.Price.Decimal.LessThan(that.Price.Decimal):
+	case this.Side == SideSell && this.Price.LessThan(that.Price):
 		result = 1
 
-	case this.Side == SideSell && this.Price.Decimal.GreaterThan(that.Price.Decimal):
+	case this.Side == SideSell && this.Price.GreaterThan(that.Price):
 		result = -1
 
-	case this.Side == SideBuy && this.Price.Decimal.LessThan(that.Price.Decimal):
+	case this.Side == SideBuy && this.Price.LessThan(that.Price):
 		result = -1
 
-	case this.Side == SideBuy && this.Price.Decimal.GreaterThan(that.Price.Decimal):
+	case this.Side == SideBuy && this.Price.GreaterThan(that.Price):
 		result = 1
 
 	default:
@@ -201,16 +199,16 @@ func StopComparator(a, b interface{}) (result int) {
 
 	// based on ask
 	switch {
-	case this.Side == SideSell && this.StopPrice.Decimal.LessThan(that.StopPrice.Decimal):
+	case this.Side == SideSell && this.StopPrice.LessThan(that.StopPrice):
 		result = 1
 
-	case this.Side == SideSell && this.StopPrice.Decimal.GreaterThan(that.StopPrice.Decimal):
+	case this.Side == SideSell && this.StopPrice.GreaterThan(that.StopPrice):
 		result = -1
 
-	case this.Side == SideBuy && this.StopPrice.Decimal.LessThan(that.StopPrice.Decimal):
+	case this.Side == SideBuy && this.StopPrice.LessThan(that.StopPrice):
 		result = -1
 
-	case this.Side == SideBuy && this.StopPrice.Decimal.GreaterThan(that.StopPrice.Decimal):
+	case this.Side == SideBuy && this.StopPrice.GreaterThan(that.StopPrice):
 		result = 1
 
 	default:

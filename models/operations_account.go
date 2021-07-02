@@ -25,6 +25,6 @@ type OperationsAccount struct {
 	CurrencyType CurrencyType
 	Description  string
 	Scope        OperationScope
-	CreatedAt    time.Time `json:"created_at"`
-	UpdatedAt    time.Time `json:"updated_at"`
+	CreatedAt    time.Time
+	UpdatedAt    time.Time
 }

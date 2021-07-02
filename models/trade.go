@@ -38,8 +38,8 @@ func (t Trade) ValidateTotal(Total decimal.Decimal) bool {
 	return Total.IsPositive()
 }
 
-func (t *Trade) Market() Market {
-	var market Market
+func (t *Trade) Market() *Market {
+	market := &Market{}
 
 	config.DataBase.First(&market, "id = ?", t.MarketID)
 
@@ -47,7 +47,7 @@ func (t *Trade) Market() Market {
 }
 
 func (t *Trade) Maker() *Member {
-	var member *Member
+	member := &Member{}
 
 	config.DataBase.First(&member, "id = ?", t.MakerID)
 
@@ -55,7 +55,7 @@ func (t *Trade) Maker() *Member {
 }
 
 func (t *Trade) Taker() *Member {
-	var member *Member
+	member := &Member{}
 
 	config.DataBase.First(&member, "id = ?", t.TakerID)
 
@@ -63,13 +63,13 @@ func (t *Trade) Taker() *Member {
 }
 
 func (t *Trade) MakerOrder() *Order {
-	var order *Order
+	order := &Order{}
 	config.DataBase.First(&order, "id = ?", t.MakerOrderID)
 	return order
 }
 
 func (t *Trade) TakerOrder() *Order {
-	var order *Order
+	order := &Order{}
 	config.DataBase.First(&order, "id = ?", t.TakerOrderID)
 	return order
 }

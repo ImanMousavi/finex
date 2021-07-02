@@ -6,22 +6,29 @@ import (
 
 	"github.com/zsmartex/go-finex/controllers"
 	"github.com/zsmartex/go-finex/controllers/market_controllers"
+	"github.com/zsmartex/go-finex/routes/middlewares"
 )
 
 func SetupRouter() *fiber.App {
 	app := fiber.New()
 	app.Use(logger.New())
 
-	app.Get("/api/v2/public/timestamp", controllers.GetTimestamp)
-	app.Get("/api/v2/public/global_price", controllers.GetGlobalPrice)
-	app.Get("/api/v2/public/markets/:market/depth", controllers.GetDepth)
+	api_v2_public := app.Group("/api/v2/public")
+	{
+		api_v2_public.Get("/timestamp", controllers.GetTimestamp)
+		api_v2_public.Get("/global_price", controllers.GetGlobalPrice)
+		api_v2_public.Get("/markets/:market/depth", controllers.GetDepth)
+	}
 
-	app.Post("/api/v2/market/orders", market_controllers.CreateOrder)
-	app.Get("/api/v2/market/orders", market_controllers.GetOrders)
-	app.Get("/api/v2/market/orders/:id", market_controllers.GetOrderByID)
-	app.Post("/api/v2/market/orders/cancel/:id", market_controllers.CancelOrderByID)
-	app.Post("/api/v2/market/orders/cancel", market_controllers.CancelAllOrders)
-	app.Get("/api/v2/market/trades", market_controllers.GetTrades)
+	api_v2_market := app.Group("/api/v2/market", middlewares.Authenticate)
+	{
+		api_v2_market.Post("/orders", market_controllers.CreateOrder)
+		api_v2_market.Get("/orders", market_controllers.GetOrders)
+		api_v2_market.Get("/orders/:id", market_controllers.GetOrderByID)
+		api_v2_market.Post("/orders/cancel/:id", market_controllers.CancelOrderByID)
+		api_v2_market.Post("/orders/cancel", market_controllers.CancelAllOrders)
+		api_v2_market.Get("/trades", market_controllers.GetTrades)
+	}
 
 	return app
 }

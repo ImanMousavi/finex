@@ -9,7 +9,6 @@ import (
 	"gorm.io/gorm"
 
 	"github.com/zsmartex/go-finex/config"
-	"github.com/zsmartex/go-finex/controllers/auth"
 	"github.com/zsmartex/go-finex/controllers/entities"
 	"github.com/zsmartex/go-finex/controllers/helpers"
 	"github.com/zsmartex/go-finex/controllers/queries"
@@ -19,13 +18,7 @@ import (
 )
 
 func CreateOrder(c *fiber.Ctx) error {
-	CurrentUser := auth.GetCurrentUser(c)
-
-	if CurrentUser == nil {
-		return c.Status(500).JSON(helpers.Errors{
-			Errors: []string{"jwt.decode_and_verify"},
-		})
-	}
+	CurrentUser := c.Locals("CurrentUser").(*models.Member)
 
 	errors := new(helpers.Errors)
 	payload := new(helpers.CreateOrderParams)
@@ -49,15 +42,9 @@ func CreateOrder(c *fiber.Ctx) error {
 }
 
 func GetOrders(c *fiber.Ctx) error {
-	CurrentUser := auth.GetCurrentUser(c)
+	CurrentUser := c.Locals("CurrentUser").(*models.Member)
 
-	if CurrentUser == nil {
-		return c.Status(500).JSON(helpers.Errors{
-			Errors: []string{"jwt.decode_and_verify"},
-		})
-	}
-
-	var orders []models.Order
+	var orders []*models.Order
 	orders_json := make([]entities.OrderEntities, 0)
 
 	params := new(queries.OrderFilters)
@@ -138,6 +125,8 @@ func GetOrders(c *fiber.Ctx) error {
 }
 
 func GetOrderByID(c *fiber.Ctx) error {
+	CurrentUser := c.Locals("CurrentUser").(*models.Member)
+
 	id, err := c.ParamsInt("id")
 	if err != nil || id <= 0 {
 		return c.Status(422).JSON(helpers.Errors{
@@ -145,17 +134,9 @@ func GetOrderByID(c *fiber.Ctx) error {
 		})
 	}
 
-	CurrentUser := auth.GetCurrentUser(c)
+	order := &models.Order{}
 
-	if CurrentUser == nil {
-		return c.Status(500).JSON(helpers.Errors{
-			Errors: []string{"jwt.decode_and_verify"},
-		})
-	}
-
-	var order *models.Order
-
-	result := config.DataBase.Where("id = ? AND member_id = ?", id, CurrentUser.ID).First(&order)
+	result := config.DataBase.Where("id = ? AND member_id = ?", id, CurrentUser.ID).First(order)
 
 	if errors.Is(result.Error, gorm.ErrRecordNotFound) {
 		return c.Status(404).JSON(helpers.Errors{
@@ -167,23 +148,18 @@ func GetOrderByID(c *fiber.Ctx) error {
 }
 
 func CancelOrderByID(c *fiber.Ctx) error {
+	CurrentUser := c.Locals("CurrentUser").(*models.Member)
+
 	id, err := c.ParamsInt("id")
 	if err != nil || id <= 0 {
 		return c.Status(422).JSON(helpers.Errors{
 			Errors: []string{"market.order.invaild_id"},
 		})
 	}
-	CurrentUser := auth.GetCurrentUser(c)
 
-	if CurrentUser == nil {
-		return c.Status(500).JSON(helpers.Errors{
-			Errors: []string{"jwt.decode_and_verify"},
-		})
-	}
+	order := &models.Order{}
 
-	var order *models.Order
-
-	result := config.DataBase.Where("id = ? AND member_id = ?", id, CurrentUser.ID).First(&order)
+	result := config.DataBase.Where("id = ? AND member_id = ?", id, CurrentUser.ID).First(order)
 
 	if errors.Is(result.Error, gorm.ErrRecordNotFound) {
 		return c.Status(404).JSON(helpers.Errors{
@@ -202,20 +178,14 @@ func CancelOrderByID(c *fiber.Ctx) error {
 }
 
 func CancelAllOrders(c *fiber.Ctx) error {
+	CurrentUser := c.Locals("CurrentUser").(*models.Member)
+
 	var orders []*models.Order
 	params := new(queries.CancelOrderParams)
 
 	if err := c.BodyParser(params); err != nil {
 		return c.Status(500).JSON(helpers.Errors{
 			Errors: []string{"server.method.invalid_message_body"},
-		})
-	}
-
-	CurrentUser := auth.GetCurrentUser(c)
-
-	if CurrentUser == nil {
-		return c.Status(500).JSON(helpers.Errors{
-			Errors: []string{"jwt.decode_and_verify"},
 		})
 	}
 

@@ -2,6 +2,7 @@ package matching
 
 import (
 	"math/rand"
+	"os"
 	"strconv"
 	"strings"
 
@@ -12,6 +13,7 @@ import (
 
 	"github.com/shopspring/decimal"
 	"github.com/stretchr/testify/suite"
+	"github.com/zsmartex/go-finex/config"
 )
 
 type suiteOrderBookTester struct {
@@ -46,17 +48,17 @@ func (ode *OrderBookEntry) Test(s *suiteOrderBookTester) {
 			id, _ := strconv.Atoi(result[0])
 			price, _ := decimal.NewFromString(result[2])
 			quantity, _ := decimal.NewFromString(result[3])
-			stopPrice := decimal.NullDecimal{Decimal: decimal.Zero, Valid: false}
+			stopPrice := decimal.Zero
 
 			if len(result) >= 5 {
 				val, _ := decimal.NewFromString(result[4])
-				stopPrice = decimal.NullDecimal{Decimal: val, Valid: true}
+				stopPrice = val
 			}
 
 			newOrder := &Order{
 				ID:        uint64(id),
 				Side:      side,
-				Price:     decimal.NullDecimal{Decimal: price, Valid: true},
+				Price:     price,
 				Quantity:  quantity,
 				StopPrice: stopPrice,
 			}
@@ -77,13 +79,15 @@ func (ode *OrderBookEntry) Test(s *suiteOrderBookTester) {
 
 			price, _ := decimal.NewFromString(result[0])
 			quantity, _ := decimal.NewFromString(result[1])
+			total := price.Mul(quantity)
 			makeID, _ := strconv.Atoi(result[2])
 			takerID, _ := strconv.Atoi(result[3])
 			expectedTrades = append(expectedTrades, &Trade{
-				Price:    price,
-				Quantity: quantity,
-				MakerID:  uint64(makeID),
-				TakerID:  uint64(takerID),
+				Price:        price,
+				Quantity:     quantity,
+				Total:        total,
+				MakerOrderID: uint64(makeID),
+				TakerOrderID: uint64(takerID),
 			})
 		}
 
@@ -92,6 +96,9 @@ func (ode *OrderBookEntry) Test(s *suiteOrderBookTester) {
 }
 
 func (s *suiteOrderBookTester) TestInsertOrder() {
+	os.Setenv("LOG_LEVEL", "DEBUG")
+	config.NewLoggerService()
+
 	orderbookFile, err := ioutil.ReadFile("./fixtures/orderbook.yaml")
 
 	s.NoError(err)
@@ -113,7 +120,7 @@ func (s *suiteOrderBookTester) TestInsertLimitOrder() {
 	limitOrder := &Order{
 		ID:       2,
 		Side:     SideBuy,
-		Price:    decimal.NullDecimal{Decimal: decimal.NewFromFloat(10.0), Valid: true},
+		Price:    decimal.NewFromFloat(10.0),
 		Quantity: decimal.NewFromFloat(30.0),
 	}
 
@@ -128,7 +135,7 @@ func (s *suiteOrderBookTester) TestInsertImmediateOrCancelOrder() {
 	iocOrder := &Order{
 		ID:                2,
 		Side:              SideBuy,
-		Price:             decimal.NullDecimal{Decimal: decimal.NewFromFloat(10.0), Valid: true},
+		Price:             decimal.NewFromFloat(10.0),
 		Quantity:          decimal.NewFromFloat(30.0),
 		ImmediateOrCancel: true,
 	}
@@ -144,14 +151,14 @@ func (s *suiteOrderBookTester) TestCancelOrder() {
 	bidOrder := &Order{
 		ID:       1,
 		Side:     SideBuy,
-		Price:    decimal.NullDecimal{Decimal: decimal.NewFromFloat(10.0), Valid: true},
+		Price:    decimal.NewFromFloat(10.0),
 		Quantity: decimal.NewFromFloat(30.0),
 	}
 
 	askOrder := &Order{
 		ID:       2,
 		Side:     SideSell,
-		Price:    decimal.NullDecimal{Decimal: decimal.NewFromFloat(10.0), Valid: true},
+		Price:    decimal.NewFromFloat(10.0),
 		Quantity: decimal.NewFromFloat(30.0),
 	}
 
@@ -198,7 +205,7 @@ func BenchmarkInsertOrder(b *testing.B) {
 		orders[n] = &Order{
 			ID:       uint64(n),
 			Side:     side,
-			Price:    decimal.NullDecimal{Decimal: decimal.NewFromFloat(float64(price)), Valid: true},
+			Price:    decimal.NewFromFloat(float64(price)),
 			Quantity: decimal.NewFromFloat(float64(quantity)),
 		}
 	}

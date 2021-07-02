@@ -22,7 +22,6 @@ type OrderBook struct {
 
 	pendingOrdersQueue *OrderQueue
 	cancelOrdersQueue  map[uint64]*Order
-	tradeBook          *TradeBook
 
 	notification *Notification
 	depth        *Depth
@@ -45,7 +44,6 @@ func NewOrderBook(symbol string) *OrderBook {
 		StopAsks:           rbt.NewWith(StopComparator),
 		pendingOrdersQueue: &orderQueue,
 		cancelOrdersQueue:  make(map[uint64]*Order, 1024),
-		tradeBook:          NewTradeBook(symbol),
 		notification:       notification,
 		depth:              NewDepth(symbol, notification),
 	}
@@ -58,7 +56,7 @@ func (od *OrderBook) InsertOrder(newOrder *Order) []*Trade {
 
 	config.Logger.Debugf("[oceanbook.orderbook] insert order with id %d - %s * %s, side %s", newOrder.ID, newOrder.Price, newOrder.Quantity, newOrder.Side)
 
-	if newOrder.StopPrice.Valid {
+	if newOrder.StopPrice.IsPositive() {
 		od.insertStopOrder(newOrder)
 
 		return []*Trade{}
@@ -118,8 +116,6 @@ func (od *OrderBook) insertOrder(newOrder *Order) []*Trade {
 			break
 		}
 
-		od.tradeBook.Enter(newTrade)
-
 		trades = append(trades, newTrade)
 		config.Logger.Debugf("[oceanbook.orderbook] new trade with price %s", newTrade.Price)
 
@@ -157,7 +153,7 @@ func (od *OrderBook) insertOrder(newOrder *Order) []*Trade {
 
 	od.depth.UpdatePriceLevel(
 		newOrder.Side,
-		newOrder.Price.Decimal,
+		newOrder.Price,
 		newOrder.PendingQuantity(),
 		1,
 	)
@@ -193,7 +189,7 @@ func (od *OrderBook) setMarketPrice(newPrice decimal.Decimal) {
 	previousPrice := od.Price
 	od.Price = newPrice
 
-	if previousPrice.Equal(decimal.Zero) {
+	if previousPrice.IsZero() {
 		return
 	}
 
@@ -207,7 +203,7 @@ func (od *OrderBook) setMarketPrice(newPrice decimal.Decimal) {
 			}
 
 			bestOrder := best.Value.(*Order)
-			if bestOrder.StopPrice.Decimal.LessThan(newPrice) {
+			if bestOrder.StopPrice.LessThan(newPrice) {
 				break
 			}
 
@@ -226,7 +222,7 @@ func (od *OrderBook) setMarketPrice(newPrice decimal.Decimal) {
 			}
 
 			bestOrder := best.Value.(*Order)
-			if bestOrder.StopPrice.Decimal.GreaterThan(newPrice) {
+			if bestOrder.StopPrice.GreaterThan(newPrice) {
 				break
 			}
 
@@ -266,7 +262,7 @@ func (od *OrderBook) CancelOrder(o *Order) {
 
 	od.depth.UpdatePriceLevel(
 		o.Side,
-		o.Price.Decimal,
+		o.Price,
 		o.PendingQuantity().Neg(),
 		-1,
 	)

@@ -20,14 +20,14 @@ type Liability struct {
 	UpdatedAt     time.Time       `json:"updated_at"`
 }
 
-func GetOperationsCode(currency Currency, kind string) int32 {
+func GetOperationsCode(currency *Currency, kind string) int32 {
 	var operations_account OperationsAccount
 	config.DataBase.Where("type = ? AND kind = ? AND currency_type = ?", TypeLiability, kind, currency.Type).Find(&operations_account)
 
 	return operations_account.Code
 }
 
-func LiabilityCredit(amount decimal.Decimal, currency Currency, reference Reference, kind string, member_id uint64) {
+func LiabilityCredit(amount decimal.Decimal, currency *Currency, reference Reference, kind string, member_id uint64) {
 	code := GetOperationsCode(currency, kind)
 
 	liability := Liability{
@@ -42,7 +42,7 @@ func LiabilityCredit(amount decimal.Decimal, currency Currency, reference Refere
 	config.DataBase.Create(&liability)
 }
 
-func LiabilityDebit(amount decimal.Decimal, currency Currency, reference Reference, kind string, member_id uint64) {
+func LiabilityDebit(amount decimal.Decimal, currency *Currency, reference Reference, kind string, member_id uint64) {
 	code := GetOperationsCode(currency, kind)
 
 	liability := Liability{
@@ -57,7 +57,7 @@ func LiabilityDebit(amount decimal.Decimal, currency Currency, reference Referen
 	config.DataBase.Create(&liability)
 }
 
-func LiabilityTranfer(amount decimal.Decimal, currency Currency, reference Reference, from_kind, to_kind string, member_id uint64) {
+func LiabilityTranfer(amount decimal.Decimal, currency *Currency, reference Reference, from_kind, to_kind string, member_id uint64) {
 	LiabilityCredit(amount, currency, reference, from_kind, member_id)
 	LiabilityDebit(amount, currency, reference, to_kind, member_id)
 }

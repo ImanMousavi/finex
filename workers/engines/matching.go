@@ -2,6 +2,7 @@ package engines
 
 import (
 	"encoding/json"
+	"errors"
 
 	"github.com/zsmartex/go-finex/config"
 	"github.com/zsmartex/go-finex/matching"
@@ -53,8 +54,12 @@ func (w MatchingWorker) Process(payload []byte) error {
 func (w MatchingWorker) SubmitOrder(order *matching.Order) error {
 	engine := w.Engines[order.Symbol]
 
+	if engine == nil {
+		return errors.New("engine not found")
+	}
+
 	if !engine.Initialized {
-		return errors.New("Engine is not ready")
+		return errors.New("engine is not ready")
 	}
 
 	return engine.Submit(order)
@@ -63,16 +68,15 @@ func (w MatchingWorker) SubmitOrder(order *matching.Order) error {
 func (w MatchingWorker) CancelOrder(order *matching.Order) error {
 	engine := w.Engines[order.Symbol]
 
+	if engine == nil {
+		return errors.New("engine not found")
+	}
+
 	if !engine.Initialized {
-		return errors.New("Engine is not ready")
+		return errors.New("engine is not ready")
 	}
 
 	return engine.Cancel(order)
-}
-
-func (w MatchingWorker) AddNewEngine(market string) *matching.Engine {
-	w.Engines[market] = matching.NewEngine(market)
-	return w.Engines[market]
 }
 
 func (w MatchingWorker) GetEngineByMarket(market string) *matching.Engine {
@@ -99,7 +103,9 @@ func (w MatchingWorker) Reload(market string) {
 }
 
 func (w MatchingWorker) InitializeEngine(market string) {
-	engine := w.AddNewEngine(market)
+	engine := matching.NewEngine(market)
+	w.Engines[market] = engine
+
 	w.LoadOrders(market)
 	engine.Initialized = true
 	config.Logger.Infof("%v engine reloaded.\n", market)

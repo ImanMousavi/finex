@@ -6,7 +6,6 @@ import (
 	"github.com/gofiber/fiber/v2"
 
 	"github.com/zsmartex/go-finex/config"
-	"github.com/zsmartex/go-finex/controllers/auth"
 	"github.com/zsmartex/go-finex/controllers/entities"
 	"github.com/zsmartex/go-finex/controllers/helpers"
 	"github.com/zsmartex/go-finex/controllers/queries"
@@ -15,6 +14,8 @@ import (
 )
 
 func GetTrades(c *fiber.Ctx) error {
+	CurrentUser := c.Locals("CurrentUser").(*models.Member)
+
 	var errors = new(helpers.Errors)
 	var trades []models.Trade
 
@@ -23,14 +24,6 @@ func GetTrades(c *fiber.Ctx) error {
 	if err := c.QueryParser(params); err != nil {
 		return c.Status(500).JSON(helpers.Errors{
 			Errors: []string{"server.method.invalid_query"},
-		})
-	}
-
-	CurrentUser := auth.GetCurrentUser(c)
-
-	if CurrentUser == nil {
-		return c.Status(500).JSON(helpers.Errors{
-			Errors: []string{"jwt.decode_and_verify"},
 		})
 	}
 

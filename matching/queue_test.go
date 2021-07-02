@@ -56,7 +56,7 @@ func BenchmarkAddQueue(b *testing.B) {
 		orders[n] = &Order{
 			ID:       uint64(n),
 			Side:     side,
-			Price:    decimal.NullDecimal{Decimal: decimal.NewFromFloat(float64(price)), Valid: true},
+			Price:    decimal.NewFromFloat(float64(price)),
 			Quantity: decimal.NewFromFloat(float64(quantity)),
 		}
 	}

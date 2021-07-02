@@ -146,18 +146,18 @@ func (o Order) OrdTypeVaildator(ord_type types.OrderType) bool {
 	return true
 }
 
-func (o *Order) Market() Market {
-	var market Market
+func (o *Order) Market() *Market {
+	market := &Market{}
 
-	config.DataBase.First(&market, "id = ?", o.MarketID)
+	config.DataBase.First(market, "id = ?", o.MarketID)
 
 	return market
 }
 
-func (o *Order) Member() Member {
-	var member Member
+func (o *Order) Member() *Member {
+	member := &Member{}
 
-	config.DataBase.Find(&member, o.MemberID)
+	config.DataBase.Find(member, o.MemberID)
 
 	return member
 }
@@ -189,11 +189,11 @@ func GetDepth(side OrderSide, market string) [][]decimal.Decimal {
 }
 
 func SubmitOrder(id uint64) error {
-	var order *Order
+	account := &Account{}
+	order := &Order{}
 
 	err := config.DataBase.Transaction(func(tx *gorm.DB) error {
 		result := tx.Clauses(clause.Locking{Strength: "UPDATE", Table: clause.Table{Name: "orders"}}).Where("id = ?", id).First(&order)
-
 		if errors.Is(result.Error, gorm.ErrRecordNotFound) {
 			return fmt.Errorf("can't find order by id : %d", order.ID)
 		}
@@ -202,11 +202,14 @@ func SubmitOrder(id uint64) error {
 			return nil
 		}
 
-		order.HoldAccount(tx.Clauses(clause.Locking{Strength: "UPDATE", Table: clause.Table{Name: "accounts"}})).LockFunds(tx, order.Locked)
+		account_tx := tx.Clauses(clause.Locking{Strength: "UPDATE", Table: clause.Table{Name: "accounts"}})
+		account_tx.Where("member_id = ? AND currency_id = ?", order.MemberID, order.Currency().ID).FirstOrCreate(account)
+		account.LockFunds(account_tx, order.Locked)
+
 		order.RecordSubmitOperations()
 
 		order.State = StateWait
-		tx.Save(&order)
+		tx.Save(order)
 
 		payload_matching_attrs, _ := json.Marshal(map[string]interface{}{
 			"action": matching.ActionSubmit,
@@ -218,21 +221,22 @@ func SubmitOrder(id uint64) error {
 	})
 
 	if err != nil {
-		result := config.DataBase.Where("id = ?", id).First(&order)
+		result := config.DataBase.Where("id = ?", id).First(order)
 
 		if errors.Is(result.Error, gorm.ErrRecordNotFound) {
 			return err
 		}
 
 		order.State = StateReject
-		config.DataBase.Save(&order)
+		config.DataBase.Save(order)
 	}
 
 	return nil
 }
 
 func CancelOrder(id uint64) error {
-	var order *Order
+	account := &Account{}
+	order := &Order{}
 
 	err := config.DataBase.Transaction(func(tx *gorm.DB) error {
 		result := tx.Clauses(clause.Locking{Strength: "UPDATE", Table: clause.Table{Name: "orders"}}).Where("id = ?", id).First(&order)
@@ -245,11 +249,14 @@ func CancelOrder(id uint64) error {
 			return nil
 		}
 
-		order.HoldAccount(tx.Clauses(clause.Locking{Strength: "UPDATE", Table: clause.Table{Name: "accounts"}})).UnlockFunds(tx, order.Locked)
+		account_tx := tx.Clauses(clause.Locking{Strength: "UPDATE", Table: clause.Table{Name: "accounts"}})
+		account_tx.Where("member_id = ? AND currency_id = ?", order.MemberID, order.Currency().ID).FirstOrCreate(account)
+		account.UnlockFunds(tx, order.Locked)
+
 		order.RecordCancelOperations()
 
 		order.State = StateCancel
-		tx.Save(&order)
+		tx.Save(order)
 
 		return nil
 	})
@@ -338,23 +345,23 @@ func (o Order) RecordCancelOperations() {
 	)
 }
 
-func (o *Order) AskCurrency() Currency {
-	var currency Currency
+func (o *Order) AskCurrency() *Currency {
+	currency := &Currency{}
 
-	config.DataBase.First(&currency, "id = ?", o.Ask)
-
-	return currency
-}
-
-func (o *Order) BidCurrency() Currency {
-	var currency Currency
-
-	config.DataBase.First(&currency, "id = ?", o.Bid)
+	config.DataBase.First(currency, "id = ?", o.Ask)
 
 	return currency
 }
 
-func (o *Order) IncomeCurrency() Currency {
+func (o *Order) BidCurrency() *Currency {
+	currency := &Currency{}
+
+	config.DataBase.First(currency, "id = ?", o.Bid)
+
+	return currency
+}
+
+func (o *Order) IncomeCurrency() *Currency {
 	switch o.Type {
 	case SideBuy:
 		return o.AskCurrency()
@@ -363,7 +370,7 @@ func (o *Order) IncomeCurrency() Currency {
 	}
 }
 
-func (o *Order) OutcomeCurrency() Currency {
+func (o *Order) OutcomeCurrency() *Currency {
 	switch o.Type {
 	case SideBuy:
 		return o.BidCurrency()
@@ -372,7 +379,7 @@ func (o *Order) OutcomeCurrency() Currency {
 	}
 }
 
-func (o *Order) Currency() Currency {
+func (o *Order) Currency() *Currency {
 	switch o.Type {
 	case SideBuy:
 		return o.BidCurrency()
@@ -383,19 +390,6 @@ func (o *Order) Currency() Currency {
 
 func (o *Order) MemberBalance() decimal.Decimal {
 	return o.Member().GetAccount(o.Currency()).Balance
-}
-
-func (o *Order) HoldAccount(tx *gorm.DB) *Account {
-	var account *Account
-
-	switch o.Type {
-	case SideBuy:
-		tx.Where("member_id = ? AND currency_id = ?", o.MemberID, o.Bid).FirstOrCreate(&account)
-	case SideSell:
-		tx.Where("member_id = ? AND currency_id = ?", o.MemberID, o.Ask).FirstOrCreate(&account)
-	}
-
-	return account
 }
 
 func (o *Order) ComputeLocked() (decimal.Decimal, error) {
@@ -546,8 +540,8 @@ func (o *Order) ToMatchingAttributes() map[string]interface{} {
 		"symbol":              o.MarketID,
 		"member_id":           o.MemberID,
 		"side":                side,
-		"price":               o.Price,
-		"stop_price":          o.StopPrice,
+		"price":               o.Price.Decimal,
+		"stop_price":          o.StopPrice.Decimal,
 		"quantity":            o.OriginVolume,
 		"filled_quantity":     o.OriginVolume.Sub(o.Volume),
 		"immediate_or_cancel": o.State == StateCancel || o.State == StateDone || o.State == StateReject,

@@ -20,14 +20,14 @@ type Revenue struct {
 	UpdatedAt     time.Time       `json:"updated_at"`
 }
 
-func GetRevenueCode(currency Currency) int32 {
+func GetRevenueCode(currency *Currency) int32 {
 	var operations_account OperationsAccount
 	config.DataBase.Where("type = ? AND currency_type = ?", TypeRevenue, currency.Type).Find(&operations_account)
 
 	return operations_account.Code
 }
 
-func RevenueCredit(amount decimal.Decimal, currency Currency, reference Reference, member_id uint64) {
+func RevenueCredit(amount decimal.Decimal, currency *Currency, reference Reference, member_id uint64) {
 	code := GetRevenueCode(currency)
 
 	revenue := Revenue{
@@ -42,7 +42,7 @@ func RevenueCredit(amount decimal.Decimal, currency Currency, reference Referenc
 	config.DataBase.Create(&revenue)
 }
 
-func RevenueDebit(amount decimal.Decimal, currency Currency, reference Reference, member_id uint64) {
+func RevenueDebit(amount decimal.Decimal, currency *Currency, reference Reference, member_id uint64) {
 	code := GetRevenueCode(currency)
 
 	revenue := Revenue{
@@ -57,7 +57,7 @@ func RevenueDebit(amount decimal.Decimal, currency Currency, reference Reference
 	config.DataBase.Create(&revenue)
 }
 
-func RevenueTranfer(amount decimal.Decimal, currency Currency, reference Reference, from_kind, to_kind string, member_id uint64) {
+func RevenueTranfer(amount decimal.Decimal, currency *Currency, reference Reference, from_kind, to_kind string, member_id uint64) {
 	RevenueCredit(amount, currency, reference, member_id)
 	RevenueDebit(amount, currency, reference, member_id)
 }

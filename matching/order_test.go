@@ -17,7 +17,7 @@ func (s *suiteMatchOrderTester) TestMatchOrderNormalCase() {
 	askOrder := &Order{
 		ID:        1,
 		Side:      SideSell,
-		Price:     decimal.NullDecimal{Decimal: decimal.NewFromFloat(2.0), Valid: true},
+		Price:     decimal.NewFromFloat(2.0),
 		Quantity:  decimal.NewFromFloat(3.0),
 		CreatedAt: time.Now(),
 	}
@@ -25,7 +25,7 @@ func (s *suiteMatchOrderTester) TestMatchOrderNormalCase() {
 	bidOrder := &Order{
 		ID:        2,
 		Side:      SideBuy,
-		Price:     decimal.NullDecimal{Decimal: decimal.NewFromFloat(2.1), Valid: true},
+		Price:     decimal.NewFromFloat(2.1),
 		Quantity:  decimal.NewFromFloat(3.0),
 		CreatedAt: time.Now(),
 	}
@@ -33,7 +33,7 @@ func (s *suiteMatchOrderTester) TestMatchOrderNormalCase() {
 	t := askOrder.Match(bidOrder)
 
 	s.Equal(t, &Trade{
-		Price:    askOrder.Price.Decimal,
+		Price:    askOrder.Price,
 		Quantity: decimal.NewFromFloat(3.0),
 		TakerID:  2,
 		MakerID:  1,
@@ -44,7 +44,7 @@ func (s *suiteMatchOrderTester) TestMatchOrderNoMatch() {
 	askOrder := &Order{
 		ID:        1,
 		Side:      SideSell,
-		Price:     decimal.NullDecimal{Decimal: decimal.NewFromFloat(3.0), Valid: true},
+		Price:     decimal.NewFromFloat(3.0),
 		Quantity:  decimal.NewFromFloat(3.0),
 		CreatedAt: time.Now(),
 	}
@@ -52,7 +52,7 @@ func (s *suiteMatchOrderTester) TestMatchOrderNoMatch() {
 	bidOrder := &Order{
 		ID:        2,
 		Side:      SideBuy,
-		Price:     decimal.NullDecimal{Decimal: decimal.NewFromFloat(2.1), Valid: true},
+		Price:     decimal.NewFromFloat(2.1),
 		Quantity:  decimal.NewFromFloat(3.0),
 		CreatedAt: time.Now(),
 	}
@@ -73,28 +73,28 @@ func (s *suiteComparatorTester) TestBidOrderComparator() {
 	b1 := Order{
 		ID:        1,
 		Side:      SideBuy,
-		Price:     decimal.NullDecimal{Decimal: decimal.NewFromFloat(1.0), Valid: true},
+		Price:     decimal.NewFromFloat(1.0),
 		CreatedAt: time.Now(),
 	}
 
 	b2 := Order{
 		ID:        2,
 		Side:      SideBuy,
-		Price:     decimal.NullDecimal{Decimal: decimal.NewFromFloat(1.0), Valid: true},
+		Price:     decimal.NewFromFloat(1.0),
 		CreatedAt: time.Now().Add(200 * time.Second),
 	}
 
 	b3 := Order{
 		ID:        3,
 		Side:      SideBuy,
-		Price:     decimal.NullDecimal{Decimal: decimal.NewFromFloat(2.0), Valid: true},
+		Price:     decimal.NewFromFloat(2.0),
 		CreatedAt: time.Now().Add(300 * time.Second),
 	}
 
 	b4 := Order{
 		ID:        4,
 		Side:      SideBuy,
-		Price:     decimal.NullDecimal{Decimal: decimal.NewFromFloat(0.5), Valid: true},
+		Price:     decimal.NewFromFloat(0.5),
 		CreatedAt: time.Now().Add(400 * time.Second),
 	}
 

@@ -17,8 +17,8 @@ var (
 var ORDER_SUBMIT_MAX_ATTEMPTS = 3
 
 type Engine struct {
-	Market    	string
-	OrderBook 	*OrderBook
+	Market      string
+	OrderBook   *OrderBook
 	Initialized bool
 }
 
@@ -28,7 +28,7 @@ func NewEngine(market string) *Engine {
 		OrderBook: NewOrderBook(
 			market,
 		),
-		Initialized: false
+		Initialized: false,
 	}
 }
 
