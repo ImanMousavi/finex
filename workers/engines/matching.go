@@ -106,7 +106,7 @@ func (w MatchingWorker) InitializeEngine(market string) {
 	engine := matching.NewEngine(market)
 	w.Engines[market] = engine
 
-	w.LoadOrders(market)
+	w.LoadOrders(engine)
 	engine.Initialized = true
 	config.Logger.Infof("%v engine reloaded.\n", market)
 }
@@ -120,12 +120,12 @@ func (w MatchingWorker) BuildOrder(order map[string]interface{}) *matching.Order
 	return mOrder
 }
 
-func (w MatchingWorker) LoadOrders(market string) {
+func (w MatchingWorker) LoadOrders(engine *matching.Engine) {
 	var orders []models.Order
-	config.DataBase.Where("market_id = ? AND state = ?", market, models.StateWait).Order("id asc").Find(&orders)
+	config.DataBase.Where("market_id = ? AND state = ?", engine.Market, models.StateWait).Order("id asc").Find(&orders)
 
 	for _, order := range orders {
 		mOrder := w.BuildOrder(order.ToMatchingAttributes())
-		w.SubmitOrder(mOrder)
+		engine.Submit(mOrder)
 	}
 }
