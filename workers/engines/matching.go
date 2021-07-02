@@ -51,11 +51,23 @@ func (w MatchingWorker) Process(payload []byte) error {
 }
 
 func (w MatchingWorker) SubmitOrder(order *matching.Order) error {
-	return w.Engines[order.Symbol].Submit(order)
+	engine := w.Engines[order.Symbol]
+
+	if !engine.Initialized {
+		return errors.New("Engine is not ready")
+	}
+
+	return engine.Submit(order)
 }
 
 func (w MatchingWorker) CancelOrder(order *matching.Order) error {
-	return w.Engines[order.Symbol].Cancel(order)
+	engine := w.Engines[order.Symbol]
+
+	if !engine.Initialized {
+		return errors.New("Engine is not ready")
+	}
+
+	return engine.Cancel(order)
 }
 
 func (w MatchingWorker) AddNewEngine(market string) *matching.Engine {
@@ -87,8 +99,9 @@ func (w MatchingWorker) Reload(market string) {
 }
 
 func (w MatchingWorker) InitializeEngine(market string) {
-	w.AddNewEngine(market)
+	engine := w.AddNewEngine(market)
 	w.LoadOrders(market)
+	engine.Initialized = true
 	config.Logger.Infof("%v engine reloaded.\n", market)
 }
 
