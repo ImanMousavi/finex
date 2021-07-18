@@ -19,6 +19,23 @@ var (
 )
 
 // Auth struct represents parsed jwt information.
+// {
+//   "iat": 1625267254,
+//   "exp": 1625270854,
+//   "sub": "session",
+//   "iss": "barong",
+//   "aud": [
+//     "peatio",
+//     "barong"
+//   ],
+//   "jti": "42ad71c6adeca427362e",
+//   "uid": "ID0814BA5B0D",
+//   "email": "business@zsmart.tech",
+//   "role": "admin",
+//   "level": 3,
+//   "state": "active",
+//   "referral_id": null
+// }
 type Auth struct {
 	UID        string         `json:"uid"`
 	State      string         `json:"state"`

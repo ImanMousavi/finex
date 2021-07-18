@@ -90,13 +90,13 @@ func (p CreateOrderParams) BuildOrder(member *models.Member, err_src *Errors) *m
 		p.OrdType = types.TypeLimit
 	}
 
-	trading_fee := models.TradingFeeFor(member.Group, market.ID)
+	trading_fee := models.TradingFeeFor(member.Group, "spot", market.Symbol)
 
 	order := &models.Order{
 		MemberID:     member.ID,
 		Ask:          market.BaseUnit,
 		Bid:          market.QuoteUnit,
-		MarketID:     market.ID,
+		MarketID:     market.Symbol,
 		OrdType:      p.OrdType,
 		State:        models.StatePending,
 		Type:         order_side,

@@ -54,6 +54,7 @@ type Order struct {
 	MakerFee      decimal.Decimal     `json:"maker_fee" gorm:"type:numeric(17,16)|default:0.0"`
 	TakerFee      decimal.Decimal     `json:"taker_fee" gorm:"type:numeric(17,16)|default:0.0"`
 	MarketID      string              `json:"market_id" validate:"required"`
+	MarketType    string              `json:"market_type" gorm:"default:spot"`
 	State         OrderState          `json:"state"`
 	Type          OrderSide           `json:"type" validate:"required"`
 	OrdType       types.OrderType     `json:"ord_type" validate:"OrdTypeVaildator"`

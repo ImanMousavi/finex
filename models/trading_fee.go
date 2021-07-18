@@ -9,13 +9,14 @@ import (
 )
 
 type TradingFee struct {
-	ID        uint64 `gorm:"primaryKey"`
-	MarketID  string
-	Group     string
-	Maker     decimal.Decimal
-	Taker     decimal.Decimal
-	CreatedAt time.Time
-	UpdatedAt time.Time
+	ID         uint64 `gorm:"primaryKey"`
+	MarketID   string
+	Group      string
+	Maker      decimal.Decimal
+	Taker      decimal.Decimal
+	MarketType string
+	CreatedAt  time.Time
+	UpdatedAt  time.Time
 }
 
 // Get trading fee for specific order that based on member group and market_id.
@@ -25,10 +26,10 @@ type TradingFee struct {
 //  3. market_id match
 //  4. both group and market_id are 'any'
 //  5. default (zero fees)
-func TradingFeeFor(group, market_id string) *TradingFee {
+func TradingFeeFor(group, market_id, market_type string) *TradingFee {
 	var trading_fees []*TradingFee
 
-	config.DataBase.Where("market_id IN ? AND group IN ?", []string{market_id, "any"}, []string{group, "any"}).Find(&trading_fees)
+	config.DataBase.Where("market_id IN ? AND market_type IN ? AND group IN ?", []string{market_id, "any"}, []string{market_type, "any"}, []string{group, "any"}).Find(&trading_fees)
 
 	trading_fee := &TradingFee{}
 

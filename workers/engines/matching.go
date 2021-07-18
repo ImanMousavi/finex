@@ -94,7 +94,7 @@ func (w MatchingWorker) Reload(market string) {
 		var markets []models.Market
 		config.DataBase.Where("state = ?", "enabled").Find(&markets)
 		for _, market := range markets {
-			w.InitializeEngine(market.ID)
+			w.InitializeEngine(market.Symbol)
 		}
 		config.Logger.Info("All engines reloaded.")
 	} else {
