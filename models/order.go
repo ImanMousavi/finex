@@ -150,7 +150,7 @@ func (o Order) OrdTypeVaildator(ord_type types.OrderType) bool {
 func (o *Order) Market() *Market {
 	market := &Market{}
 
-	config.DataBase.First(market, "id = ?", o.MarketID)
+	config.DataBase.First(market, "symbol = ?", o.MarketID)
 
 	return market
 }

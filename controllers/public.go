@@ -8,6 +8,7 @@ import (
 	"github.com/shopspring/decimal"
 	"github.com/zsmartex/go-finex/config"
 	"github.com/zsmartex/go-finex/controllers/helpers"
+	"github.com/zsmartex/go-finex/controllers/queries"
 	"github.com/zsmartex/go-finex/types"
 )
 
@@ -19,7 +20,26 @@ func GetTimestamp(c *fiber.Ctx) error {
 }
 
 func GetDepth(c *fiber.Ctx) error {
+	var errors = new(helpers.Errors)
+
 	market := c.Params("market")
+	params := new(queries.DepthQuery)
+	if err := c.QueryParser(params); err != nil {
+		return c.Status(500).JSON(helpers.Errors{
+			Errors: []string{"server.method.invalid_query"},
+		})
+	}
+
+	helpers.Vaildate(params, errors)
+
+	if errors.Size() > 0 {
+		return c.Status(422).JSON(errors)
+	}
+
+	if params.Limit == 0 {
+		params.Limit = 100
+	}
+
 	depth := types.Depth{
 		Asks:     [][]decimal.Decimal{},
 		Bids:     [][]decimal.Decimal{},
@@ -27,7 +47,11 @@ func GetDepth(c *fiber.Ctx) error {
 	}
 
 	var err error
-	msg, err := config.Nats.Request("depth:"+market, []byte(market), 10*time.Millisecond)
+	payload, _ := json.Marshal(map[string]interface{}{
+		"market": market,
+		"limit":  params.Limit,
+	})
+	msg, err := config.Nats.Request("depth:"+market, payload, 10*time.Millisecond)
 
 	if err != nil {
 		return c.Status(200).JSON(depth)

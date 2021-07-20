@@ -26,10 +26,15 @@ type TradingFee struct {
 //  3. market_id match
 //  4. both group and market_id are 'any'
 //  5. default (zero fees)
-func TradingFeeFor(group, market_id, market_type string) *TradingFee {
+func TradingFeeFor(group, market_type, market_id string) *TradingFee {
 	var trading_fees []*TradingFee
 
-	config.DataBase.Where("market_id IN ? AND market_type IN ? AND group IN ?", []string{market_id, "any"}, []string{market_type, "any"}, []string{group, "any"}).Find(&trading_fees)
+	config.DataBase.Where(
+		"\"market_id\" IN ? AND \"market_type\" IN ? AND \"group\" IN ?",
+		[]string{market_id, "any"},
+		[]string{market_type, "any"},
+		[]string{group, "any"},
+	).Find(&trading_fees)
 
 	trading_fee := &TradingFee{}
 

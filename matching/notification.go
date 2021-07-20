@@ -31,6 +31,11 @@ type Notification struct {
 	NotifyMutex sync.RWMutex
 }
 
+type GetDepthPayload struct {
+	Market string `json:"market"`
+	Limit  int    `json:"limit"`
+}
+
 func NewNotification(symbol string) *Notification {
 	notification := &Notification{
 		Symbol:   symbol,
@@ -58,15 +63,40 @@ func (n *Notification) Start() {
 
 func (n *Notification) SubscribeFetch() {
 	config.Nats.Subscribe("depth:"+n.Symbol, func(m *nats.Msg) {
-		n.NotifyMutex.Lock()
+		n.NotifyMutex.RLock()
+
+		var payload GetDepthPayload
+		json.Unmarshal(m.Data, &payload)
+
 		asks_depth := make([][]decimal.Decimal, 0)
 		bids_depth := make([][]decimal.Decimal, 0)
 
+		var i = 0
 		for price, amount := range n.Book.Asks {
 			asks_depth = append(asks_depth, []decimal.Decimal{price, amount})
+			i++
+			if i == payload.Limit {
+				break
+			}
 		}
-		for price, amount := range n.Book.Bids {
+		i = 0
+		var priceLst []decimal.Decimal
+		var reversed []decimal.Decimal
+		for price := range n.Book.Bids {
+			priceLst = append(priceLst, price)
+		}
+		for i := range priceLst {
+			n := priceLst[len(priceLst)-1-i]
+			reversed = append(reversed, n)
+		}
+		for i = 0; i < len(priceLst); i++ {
+			price := priceLst[i]
+			amount := n.Book.Bids[price]
 			bids_depth = append(bids_depth, []decimal.Decimal{price, amount})
+			i++
+			if i == payload.Limit {
+				break
+			}
 		}
 
 		depth_message, err := json.Marshal(DepthJSON{
@@ -80,7 +110,7 @@ func (n *Notification) SubscribeFetch() {
 		}
 
 		m.Respond(depth_message)
-		n.NotifyMutex.Unlock()
+		n.NotifyMutex.RUnlock()
 	})
 }
 

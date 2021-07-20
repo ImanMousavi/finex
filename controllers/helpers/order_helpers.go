@@ -67,7 +67,7 @@ func (p CreateOrderParams) VaildateSide(val types.OrderSide) bool {
 func (p CreateOrderParams) GetMarket() models.Market {
 	var market models.Market
 
-	config.DataBase.First(&market, "id = ?", p.Market)
+	config.DataBase.First(&market, "symbol = ?", p.Market)
 
 	return market
 }

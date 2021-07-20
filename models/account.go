@@ -14,7 +14,6 @@ import (
 var Zero float64 = 0
 
 type Account struct {
-	ID         uint64          `json:"id" gorm:"primaryKey"`
 	MemberID   uint64          `json:"member_id"`
 	CurrencyID string          `json:"currency_id"`
 	Balance    decimal.Decimal `json:"balance" validate:"ValidateBalance"`
@@ -47,12 +46,6 @@ func (a *Account) Member() *Member {
 	return member
 }
 
-func (a *Account) BeforeSave(tx *gorm.DB) (err error) {
-	a.TriggerEvent()
-
-	return
-}
-
 func (a *Account) TriggerEvent() {
 	member := a.Member()
 	payload_message, _ := json.Marshal(a.ToJSON())
@@ -65,8 +58,9 @@ func (a *Account) PlusFunds(tx *gorm.DB, amount decimal.Decimal) error {
 		return fmt.Errorf("cannot add funds (member id: %d, currency id: %s, amount: %s, balance: %s)", a.MemberID, a.CurrencyID, amount.String(), a.Balance.String())
 	}
 
-	a.Balance = a.Balance.Add(amount)
-	return tx.Save(&a).Error
+	tx = tx.Model(a).Where("currency_id = ? AND member_id = ?", a.CurrencyID, a.MemberID).Updates(Account{Balance: a.Balance.Add(amount)})
+	a.TriggerEvent()
+	return tx.Error
 }
 
 func (a *Account) PlusLockedFunds(tx *gorm.DB, amount decimal.Decimal) error {
@@ -74,8 +68,9 @@ func (a *Account) PlusLockedFunds(tx *gorm.DB, amount decimal.Decimal) error {
 		return fmt.Errorf("cannot add funds (member id: %d, currency id: %s, amount: %s, locked: %s)", a.MemberID, a.CurrencyID, amount.String(), a.Locked.String())
 	}
 
-	a.Locked = a.Locked.Add(amount)
-	return tx.Save(&a).Error
+	tx = tx.Model(a).Where("currency_id = ? AND member_id = ?", a.CurrencyID, a.MemberID).Updates(Account{Locked: a.Locked.Add(amount)})
+	a.TriggerEvent()
+	return tx.Error
 }
 
 func (a *Account) SubFunds(tx *gorm.DB, amount decimal.Decimal) error {
@@ -83,8 +78,9 @@ func (a *Account) SubFunds(tx *gorm.DB, amount decimal.Decimal) error {
 		return fmt.Errorf("cannot subtract funds (member id: %d, currency id: %s, amount: %s, balance: %s)", a.MemberID, a.CurrencyID, amount.String(), a.Balance.String())
 	}
 
-	a.Balance = a.Balance.Sub(amount)
-	return tx.Save(&a).Error
+	tx = tx.Model(a).Where("currency_id = ? AND member_id = ?", a.CurrencyID, a.MemberID).Updates(Account{Balance: a.Balance.Sub(amount)})
+	a.TriggerEvent()
+	return tx.Error
 }
 
 func (a *Account) LockFunds(tx *gorm.DB, amount decimal.Decimal) error {
@@ -92,9 +88,9 @@ func (a *Account) LockFunds(tx *gorm.DB, amount decimal.Decimal) error {
 		return fmt.Errorf("cannot lock funds (member id: %d, currency id: %s, amount: %s, balance: %s, locked: %s)", a.MemberID, a.CurrencyID, amount.String(), a.Balance.String(), a.Locked.String())
 	}
 
-	a.Balance = a.Balance.Sub(amount)
-	a.Locked = a.Locked.Add(amount)
-	return tx.Save(&a).Error
+	tx = tx.Model(a).Where("currency_id = ? AND member_id = ?", a.CurrencyID, a.MemberID).Updates(Account{Balance: a.Balance.Sub(amount), Locked: a.Locked.Add(amount)})
+	a.TriggerEvent()
+	return tx.Error
 }
 
 func (a *Account) UnlockFunds(tx *gorm.DB, amount decimal.Decimal) error {
@@ -102,9 +98,9 @@ func (a *Account) UnlockFunds(tx *gorm.DB, amount decimal.Decimal) error {
 		return fmt.Errorf("cannot unlock funds (member id: %d, currency id: %s, amount: %s, balance: %s, locked: %s)", a.MemberID, a.CurrencyID, amount.String(), a.Balance.String(), a.Locked.String())
 	}
 
-	a.Balance = a.Balance.Add(amount)
-	a.Locked = a.Locked.Sub(amount)
-	return tx.Save(&a).Error
+	tx = tx.Model(a).Where("currency_id = ? AND member_id = ?", a.CurrencyID, a.MemberID).Updates(Account{Balance: a.Balance.Add(amount), Locked: a.Locked.Sub(amount)})
+	a.TriggerEvent()
+	return tx.Error
 }
 
 func (a *Account) UnlockAndSubFunds(tx *gorm.DB, amount decimal.Decimal) error {
@@ -112,8 +108,9 @@ func (a *Account) UnlockAndSubFunds(tx *gorm.DB, amount decimal.Decimal) error {
 		return fmt.Errorf("cannot unlock and sub funds (member id: %d, currency id: %s, amount: %s, balance: %s, locked: %s)", a.MemberID, a.CurrencyID, amount.String(), a.Balance.String(), a.Locked.String())
 	}
 
-	a.Locked = a.Locked.Sub(amount)
-	return tx.Save(&a).Error
+	tx = tx.Model(a).Where("currency_id = ? AND member_id = ?", a.CurrencyID, a.MemberID).Updates(Account{Locked: a.Locked.Sub(amount)})
+	a.TriggerEvent()
+	return tx.Error
 }
 
 func (a *Account) Amount() decimal.Decimal {

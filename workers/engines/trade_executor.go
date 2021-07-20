@@ -98,7 +98,7 @@ func (t *TradeExecutor) CreateTradeAndStrikeOrders() (*models.Trade, error) {
 		var market *models.Market
 		accounts_table := make(map[string]*models.Account)
 
-		config.DataBase.First(&market, "id = ?", t.TradePayload.Symbol)
+		config.DataBase.First(&market, "symbol = ?", t.TradePayload.Symbol)
 
 		tx.Clauses(clause.Locking{
 			Strength: "UPDATE",
