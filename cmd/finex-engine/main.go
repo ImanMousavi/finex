@@ -73,7 +73,7 @@ func main() {
 				continue
 			}
 
-			config.Logger.Debugf("Receive message: %s", string(m.Data))
+			config.Logger.Infof("Receive message: %s", string(m.Data))
 			if err := worker.Process(m.Data); err == nil {
 				m.Ack()
 			} else {

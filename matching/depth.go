@@ -83,10 +83,12 @@ func (d *Depth) UpdatePriceLevel(side Side, price, quantity decimal.Decimal, cou
 	existedPriceLevel.Quantity = existedPriceLevel.Quantity.Add(pl.Quantity)
 	existedPriceLevel.Count += pl.Count
 
-	if existedPriceLevel.Count == 0 || existedPriceLevel.Quantity.Equal(decimal.Zero) {
+	if existedPriceLevel.Count == 0 || existedPriceLevel.Quantity.IsZero() {
 		priceLevels.Remove(existedPriceLevel.Key())
+		d.NotificationPublish(side, price, decimal.Zero)
+	} else {
+		d.NotificationPublish(side, price, existedPriceLevel.Quantity)
 	}
-	d.NotificationPublish(side, price, existedPriceLevel.Quantity)
 }
 
 func (d *Depth) NotificationPublish(side Side, price, quantity decimal.Decimal) {

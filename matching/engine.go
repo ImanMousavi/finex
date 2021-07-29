@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 
 	"github.com/zsmartex/go-finex/config"
+	"github.com/zsmartex/go-finex/mq_client"
 )
 
 type PayloadAction = string
@@ -36,10 +37,23 @@ func (e Engine) Submit(order *Order) error {
 	trades := e.OrderBook.InsertOrder(order)
 
 	for _, trade := range trades {
-		trade_message, _ := json.Marshal(trade)
-		if err := config.Nats.Publish("trade_executor", trade_message); err != nil {
-			return err
-		}
+		trade_message, _ := json.Marshal(map[string]interface{}{
+			"action": "execute",
+			"trade": map[string]interface{}{
+				"market_id":      trade.Symbol,
+				"maker_order_id": trade.MakerOrderID,
+				"taker_order_id": trade.TakerOrderID,
+				"strike_price":   trade.Price,
+				"amount":         trade.Quantity,
+				"total":          trade.Total,
+			},
+		})
+		config.Logger.Infof("%v, %v", trade.MakerOrderID, trade.TakerOrderID)
+		mq_client.Enqueue("trade_executor", trade_message)
+		// TODO: Fix finex trade_executor
+		// if err := config.Nats.Publish("trade_executor", trade_message); err != nil {
+		// 	return err
+		// }
 	}
 
 	return nil
