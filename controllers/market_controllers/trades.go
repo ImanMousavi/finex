@@ -5,12 +5,12 @@ import (
 
 	"github.com/gofiber/fiber/v2"
 
-	"github.com/zsmartex/go-finex/config"
-	"github.com/zsmartex/go-finex/controllers/entities"
-	"github.com/zsmartex/go-finex/controllers/helpers"
-	"github.com/zsmartex/go-finex/controllers/queries"
-	"github.com/zsmartex/go-finex/models"
-	"github.com/zsmartex/go-finex/types"
+	"github.com/zsmartex/finex/config"
+	"github.com/zsmartex/finex/controllers/entities"
+	"github.com/zsmartex/finex/controllers/helpers"
+	"github.com/zsmartex/finex/controllers/queries"
+	"github.com/zsmartex/finex/models"
+	"github.com/zsmartex/finex/types"
 )
 
 func GetTrades(c *fiber.Ctx) error {

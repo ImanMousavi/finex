@@ -1,8 +1,8 @@
 package queries
 
 import (
-	"github.com/zsmartex/go-finex/controllers/helpers"
-	"github.com/zsmartex/go-finex/types"
+	"github.com/zsmartex/finex/controllers/helpers"
+	"github.com/zsmartex/finex/types"
 )
 
 type TradeFilters struct {

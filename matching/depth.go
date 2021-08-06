@@ -1,120 +1,151 @@
 package matching
 
 import (
+	"encoding/json"
 	"sync"
 
-	rbt "github.com/emirpasic/gods/trees/redblacktree"
+	"github.com/emirpasic/gods/trees/redblacktree"
+	"github.com/nats-io/nats.go"
 	"github.com/shopspring/decimal"
-	"github.com/zsmartex/go-finex/config"
+	"github.com/zsmartex/finex/config"
 )
 
-// PriceLevel .
-type PriceLevel struct {
-	Price    decimal.Decimal
-	Quantity decimal.Decimal
-	Side     Side
-	Count    int32
-}
-
-// PriceLevelKey .
-type PriceLevelKey struct {
-	Price decimal.Decimal
-	Side  Side
-}
-
-// Key returns a key for PriceLevel.
-func (pl *PriceLevel) Key() *PriceLevelKey {
-	return &PriceLevelKey{
-		Price: pl.Price,
-		Side:  pl.Side,
-	}
-}
-
-// Depth .
 type Depth struct {
+	depthMutex   sync.Mutex
 	Symbol       string
-	Bids         *rbt.Tree
-	Asks         *rbt.Tree
-	Sequence     uint64
+	Asks         *redblacktree.Tree
+	Bids         *redblacktree.Tree
 	Notification *Notification
-	depthMutex   sync.RWMutex
 }
 
-// NewDepth returns a depth with specific scale.
-func NewDepth(symbol string, notification *Notification) *Depth {
-	return &Depth{
+func NewDepth(symbol string) *Depth {
+	depth := &Depth{
 		Symbol:       symbol,
-		Bids:         rbt.NewWith(PriceLevelComparator),
-		Asks:         rbt.NewWith(PriceLevelComparator),
-		Notification: notification,
+		Asks:         redblacktree.NewWith(makeComparator),
+		Bids:         redblacktree.NewWith(makeComparator),
+		Notification: NewNotification(symbol),
 	}
+
+	depth.SubscribeFetch()
+
+	return depth
 }
 
-// UpdatePriceLevel updates depth with price level.
-func (d *Depth) UpdatePriceLevel(side Side, price, quantity decimal.Decimal, count int32) {
+func (d *Depth) Add(order *Order) {
 	d.depthMutex.Lock()
 	defer d.depthMutex.Unlock()
-
-	var priceLevels *rbt.Tree
-	pl := &PriceLevel{
-		Price:    price,
-		Side:     side,
-		Quantity: quantity,
-		Count:    count,
+	var price_levels *redblacktree.Tree
+	if order.Side == SideSell {
+		price_levels = d.Asks
+	} else {
+		price_levels = d.Bids
 	}
 
-	switch pl.Side {
-	case SideSell:
-		priceLevels = d.Asks
-	case SideBuy:
-		priceLevels = d.Bids
-	default:
-		config.Logger.Errorf("[depth] invalid price level side %s", pl.Side)
-	}
+	pl := NewPriceLevel(order.Side, order.Price)
 
-	foundPriceLevel, found := priceLevels.Get(pl.Key())
+	value, found := price_levels.Get(pl.Key())
+
 	if !found {
-		priceLevels.Put(pl.Key(), pl)
-		d.NotificationPublish(side, price, pl.Quantity)
+		pl.Add(order)
+		price_levels.Put(pl.Key(), pl)
+		d.Notification.Publish(order.Side, order.Price, pl.Total())
 		return
 	}
 
-	existedPriceLevel := foundPriceLevel.(*PriceLevel)
-	existedPriceLevel.Quantity = existedPriceLevel.Quantity.Add(pl.Quantity)
-	existedPriceLevel.Count += pl.Count
+	price_level := value.(*PriceLevel)
+	price_level.Add(order)
+	d.Notification.Publish(order.Side, order.Price, price_level.Total())
+}
 
-	if existedPriceLevel.Count == 0 || existedPriceLevel.Quantity.IsZero() {
-		priceLevels.Remove(existedPriceLevel.Key())
-		d.NotificationPublish(side, price, decimal.Zero)
+func (d *Depth) Remove(order *Order) {
+	d.depthMutex.Lock()
+	defer d.depthMutex.Unlock()
+	var price_levels *redblacktree.Tree
+	if order.Side == SideSell {
+		price_levels = d.Asks
 	} else {
-		d.NotificationPublish(side, price, existedPriceLevel.Quantity)
+		price_levels = d.Bids
+	}
+
+	pl := NewPriceLevel(order.Side, order.Price)
+
+	value, found := price_levels.Get(pl.Key())
+
+	if !found {
+		return
+	}
+
+	price_level := value.(*PriceLevel)
+	price_level.Remove(order)
+	d.Notification.Publish(order.Side, order.Price, price_level.Total())
+
+	if price_level.Size() == 0 {
+		price_levels.Remove(pl.Key())
 	}
 }
 
-func (d *Depth) NotificationPublish(side Side, price, quantity decimal.Decimal) {
-	d.Notification.Publish(side, price, quantity)
+type GetDepthPayload struct {
+	Market string `json:"market"`
+	Limit  int    `json:"limit"`
 }
 
-// PriceLevelComparator .
-func PriceLevelComparator(a, b interface{}) int {
-	this := a.(*PriceLevelKey)
-	that := b.(*PriceLevelKey)
+func (d *Depth) SubscribeFetch() {
+	config.Nats.Subscribe("finex:depth:"+d.Symbol, func(m *nats.Msg) {
+		d.depthMutex.Lock()
+		defer d.depthMutex.Unlock()
+
+		var payload GetDepthPayload
+		json.Unmarshal(m.Data, &payload)
+
+		depth := DepthJSON{
+			Asks:     make([][]decimal.Decimal, 0),
+			Bids:     make([][]decimal.Decimal, 0),
+			Sequence: 0,
+		}
+
+		ait := d.Asks.Iterator()
+		ait.End()
+		for i := 0; ait.Prev() && i < payload.Limit; i++ {
+			price_level := ait.Value().(*PriceLevel)
+			depth.Asks = append(depth.Asks, []decimal.Decimal{price_level.Price, price_level.Total()})
+		}
+
+		bit := d.Bids.Iterator()
+		bit.End()
+		for i := 0; bit.Prev() && i < payload.Limit; i++ {
+			price_level := bit.Value().(*PriceLevel)
+			depth.Bids = append(depth.Bids, []decimal.Decimal{price_level.Price, price_level.Total()})
+		}
+		depth.Sequence = d.Notification.Sequence
+
+		depth_message, err := json.Marshal(depth)
+
+		if err != nil {
+			config.Logger.Errorf("Error: %s", err.Error())
+		}
+
+		m.Respond(depth_message)
+	})
+}
+
+func makeComparator(a, b interface{}) int {
+	aPriceLevel := a.(*PriceLevelKey)
+	bPriceLevel := b.(*PriceLevelKey)
 
 	switch {
-	case this.Side == SideSell && this.Price.LessThan(that.Price):
+	case aPriceLevel.Side == SideSell && aPriceLevel.Price.LessThan(bPriceLevel.Price):
 		return 1
 
-	case this.Side == SideSell && this.Price.GreaterThan(that.Price):
+	case aPriceLevel.Side == SideSell && aPriceLevel.Price.GreaterThan(bPriceLevel.Price):
 		return -1
 
-	case this.Side == SideBuy && this.Price.LessThan(that.Price):
+	case aPriceLevel.Side == SideBuy && aPriceLevel.Price.LessThan(bPriceLevel.Price):
 		return -1
 
-	case this.Side == SideBuy && this.Price.GreaterThan(that.Price):
+	case aPriceLevel.Side == SideBuy && aPriceLevel.Price.GreaterThan(bPriceLevel.Price):
 		return 1
 
 	default:
+		return 0
 	}
-
-	return 0
 }

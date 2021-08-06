@@ -4,9 +4,9 @@ import (
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/logger"
 
-	"github.com/zsmartex/go-finex/controllers"
-	"github.com/zsmartex/go-finex/controllers/market_controllers"
-	"github.com/zsmartex/go-finex/routes/middlewares"
+	"github.com/zsmartex/finex/controllers"
+	"github.com/zsmartex/finex/controllers/market_controllers"
+	"github.com/zsmartex/finex/routes/middlewares"
 )
 
 func SetupRouter() *fiber.App {

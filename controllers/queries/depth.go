@@ -1,6 +1,6 @@
 package queries
 
-import "github.com/zsmartex/go-finex/controllers/helpers"
+import "github.com/zsmartex/finex/controllers/helpers"
 
 type DepthQuery struct {
 	Limit int `query:"limit" validate:"uint"`

@@ -3,9 +3,9 @@ package engines
 import (
 	"encoding/json"
 
-	"github.com/zsmartex/go-finex/config"
-	"github.com/zsmartex/go-finex/matching"
-	"github.com/zsmartex/go-finex/models"
+	"github.com/zsmartex/finex/config"
+	"github.com/zsmartex/finex/matching"
+	"github.com/zsmartex/finex/models"
 )
 
 type OrderProcessorPayloadMessage struct {

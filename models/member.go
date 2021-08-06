@@ -4,7 +4,7 @@ import (
 	"database/sql"
 	"time"
 
-	"github.com/zsmartex/go-finex/config"
+	"github.com/zsmartex/finex/config"
 )
 
 type Member struct {

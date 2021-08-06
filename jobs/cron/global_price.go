@@ -6,8 +6,8 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/zsmartex/go-finex/config"
-	"github.com/zsmartex/go-finex/types"
+	"github.com/zsmartex/finex/config"
+	"github.com/zsmartex/finex/types"
 )
 
 type GlobalPriceJob struct {

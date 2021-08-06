@@ -5,10 +5,10 @@ import (
 	"time"
 
 	"github.com/shopspring/decimal"
-	"github.com/zsmartex/go-finex/config"
-	"github.com/zsmartex/go-finex/controllers/entities"
-	"github.com/zsmartex/go-finex/mq_client"
-	"github.com/zsmartex/go-finex/types"
+	"github.com/zsmartex/finex/config"
+	"github.com/zsmartex/finex/controllers/entities"
+	"github.com/zsmartex/finex/mq_client"
+	"github.com/zsmartex/finex/types"
 )
 
 type Trade struct {

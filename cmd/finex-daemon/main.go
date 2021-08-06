@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/zsmartex/go-finex/config"
-	"github.com/zsmartex/go-finex/mq_client"
-	"github.com/zsmartex/go-finex/workers/daemons"
+	"github.com/zsmartex/finex/config"
+	"github.com/zsmartex/finex/mq_client"
+	"github.com/zsmartex/finex/workers/daemons"
 )
 
 func CreateWorker(id string) daemons.Worker {

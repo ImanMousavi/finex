@@ -1,9 +1,9 @@
 package main
 
 import (
-	"github.com/zsmartex/go-finex/config"
-	"github.com/zsmartex/go-finex/mq_client"
-	"github.com/zsmartex/go-finex/routes"
+	"github.com/zsmartex/finex/config"
+	"github.com/zsmartex/finex/mq_client"
+	"github.com/zsmartex/finex/routes"
 )
 
 func main() {

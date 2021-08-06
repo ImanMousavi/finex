@@ -6,8 +6,8 @@ import (
 	"time"
 
 	"github.com/shopspring/decimal"
-	"github.com/zsmartex/go-finex/config"
-	"github.com/zsmartex/go-finex/mq_client"
+	"github.com/zsmartex/finex/config"
+	"github.com/zsmartex/finex/mq_client"
 	"gorm.io/gorm"
 )
 

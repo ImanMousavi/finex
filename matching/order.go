@@ -3,226 +3,84 @@ package matching
 import (
 	"time"
 
-	"github.com/emirpasic/gods/utils"
 	"github.com/shopspring/decimal"
-	"github.com/zsmartex/go-finex/config"
 )
 
-// Side is the orders' side.
-type Side string
+type OrderSide string
+type OrderType string
 
-const (
-	// SideSell represents the ask order side.
-	SideSell Side = "sell"
-
-	// SideBuy represents the bid order side.
-	SideBuy Side = "buy"
+var (
+	SideSell OrderSide = "sell"
+	SideBuy  OrderSide = "buy"
 )
 
-// Order .
+var (
+	TypeLimit  OrderType = "limit"
+	TypeMarket OrderType = "market"
+)
+
 type Order struct {
-	ID                uint64          `json:"id"`
-	Symbol            string          `json:"symbol"`
-	MemberID          uint64          `json:"member_id"`
-	Side              Side            `json:"side"`
-	Price             decimal.Decimal `json:"price"`
-	StopPrice         decimal.Decimal `json:"stop_price"`
-	Quantity          decimal.Decimal `json:"quantity"`
-	FilledQuantity    decimal.Decimal `json:"filled_quantity"`
-	ImmediateOrCancel bool            `json:"immediate_or_cancel"`
-	CreatedAt         time.Time       `json:"created_at"`
+	ID             uint64          `json:"id"`
+	MemberID       uint64          `json:"member_id"`
+	Symbol         string          `json:"symbol"`
+	Side           OrderSide       `json:"side"`
+	Type           OrderType       `json:"type"`
+	Price          decimal.Decimal `json:"price"`
+	StopPrice      decimal.Decimal `json:"stop_price"`
+	Quantity       decimal.Decimal `json:"quantity"`
+	FilledQuantity decimal.Decimal `json:"filled_quantity"`
+	Cancelled      bool            `json:"canceled"`
+	CreatedAt      time.Time       `json:"created_at"`
 }
 
-// Key is used to sort orders in red black tree.
-type Key struct {
-	ID        uint64          `json:"id"`
-	Side      Side            `json:"side"`
-	Price     decimal.Decimal `json:"price"`
-	StopPrice decimal.Decimal `json:"stop_price"`
-	CreatedAt time.Time       `json:"created_at"`
+type OrderKey struct {
+	ID        uint64
+	Symbol    string
+	Side      OrderSide
+	Price     decimal.Decimal
+	StopPrice decimal.Decimal
+	CreatedAt time.Time
 }
 
-// Key returns a Key.
-func (o *Order) Key() *Key {
-	return &Key{
+func (o *Order) Key() *OrderKey {
+	return &OrderKey{
 		ID:        o.ID,
+		Symbol:    o.Symbol,
 		Side:      o.Side,
 		Price:     o.Price,
+		StopPrice: o.StopPrice,
 		CreatedAt: o.CreatedAt,
 	}
 }
 
-// Filled returns true when its filled quantity equals to quantity.
-func (o *Order) Filled() bool {
-	return o.Quantity.Equal(o.FilledQuantity)
+func (o *Order) IsBid() bool {
+	return o.Side == SideBuy
 }
 
-// PendingQuantity is the remaing quantity.
-func (o *Order) PendingQuantity() decimal.Decimal {
-	return o.Quantity.Sub(o.FilledQuantity)
+func (o *Order) IsAsk() bool {
+	return o.Side == SideSell
 }
 
-// Fill updates order filled quantity with passing arguments.
 func (o *Order) Fill(quantity decimal.Decimal) {
 	o.FilledQuantity = o.FilledQuantity.Add(quantity)
 }
 
-// IsLimit returns true when the order is limit order.
-func (o *Order) IsLimit() bool {
-	return o.Price.IsPositive()
+func (o *Order) Filled() bool {
+	return o.Quantity.Equal(o.FilledQuantity)
 }
 
-// IsMarket returns true when the order is market order.
-func (o *Order) IsMarket() bool {
-	return o.Price.IsZero()
+func (o *Order) UnfilledQuantity() decimal.Decimal {
+	return o.Quantity.Sub(o.FilledQuantity)
 }
 
-// Match matches maker with a taker and returns trade if there is a match.
-func (o *Order) Match(taker *Order) *Trade {
-	maker := o
-	if maker.Side == taker.Side {
-		config.Logger.Errorf("[oceanbook.orderbook] match order with same side %s, %d, %d", maker.Side, maker.ID, taker.ID)
-		return nil
+func (o *Order) IsCrossed(price decimal.Decimal) bool {
+	if o.Side == SideSell {
+		return price.GreaterThanOrEqual(o.Price)
+	} else {
+		return price.LessThanOrEqual(o.Price)
 	}
-
-	var bidOrder *Order
-	var askOrder *Order
-
-	switch maker.Side {
-	case SideBuy:
-		bidOrder = maker
-		askOrder = taker
-
-	case SideSell:
-		bidOrder = taker
-		askOrder = maker
-	}
-
-	switch {
-	case taker.IsLimit():
-		if bidOrder.Price.GreaterThanOrEqual(askOrder.Price) {
-			filledQuantity := decimal.Min(bidOrder.PendingQuantity(), askOrder.PendingQuantity())
-			total := filledQuantity.Mul(maker.Price)
-			bidOrder.Fill(filledQuantity)
-			askOrder.Fill(filledQuantity)
-
-			return &Trade{
-				Symbol:       o.Symbol,
-				Price:        maker.Price,
-				Quantity:     filledQuantity,
-				Total:        total,
-				MakerOrderID: maker.ID,
-				TakerOrderID: taker.ID,
-				MakerID:      maker.MemberID,
-				TakerID:      taker.MemberID,
-			}
-		}
-
-		return nil
-
-	case taker.IsMarket():
-		filledQuantity := decimal.Min(bidOrder.PendingQuantity(), askOrder.PendingQuantity())
-		total := filledQuantity.Mul(maker.Price)
-		bidOrder.Fill(filledQuantity)
-		askOrder.Fill(filledQuantity)
-
-		return &Trade{
-			Symbol:       o.Symbol,
-			Price:        maker.Price,
-			Quantity:     filledQuantity,
-			Total:        total,
-			MakerOrderID: maker.ID,
-			TakerOrderID: taker.ID,
-			MakerID:      maker.MemberID,
-			TakerID:      taker.MemberID,
-		}
-	}
-
-	return nil
 }
 
-// Comparator is used for comparing Key.
-func Comparator(a, b interface{}) (result int) {
-	this := a.(*Key)
-	that := b.(*Key)
-
-	if this.Side != that.Side {
-		config.Logger.Errorf("[oceanbook.orderbook] compare order with different sides")
-	}
-
-	if this.ID == that.ID {
-		return
-	}
-
-	// based on ask
-	switch {
-	case this.Side == SideSell && this.Price.LessThan(that.Price):
-		result = 1
-
-	case this.Side == SideSell && this.Price.GreaterThan(that.Price):
-		result = -1
-
-	case this.Side == SideBuy && this.Price.LessThan(that.Price):
-		result = -1
-
-	case this.Side == SideBuy && this.Price.GreaterThan(that.Price):
-		result = 1
-
-	default:
-		switch {
-		case this.CreatedAt.Before(that.CreatedAt):
-			result = 1
-
-		case this.CreatedAt.After(that.CreatedAt):
-			result = -1
-
-		default:
-			result = utils.UInt64Comparator(this.ID, that.ID) * -1
-		}
-	}
-
-	return
-}
-
-// StopComparator is used for comparing Key.
-func StopComparator(a, b interface{}) (result int) {
-	this := a.(*Key)
-	that := b.(*Key)
-
-	if this.Side != that.Side {
-		config.Logger.Errorf("[oceanbook.orderbook] compare order with different sides")
-	}
-
-	if this.ID == that.ID {
-		return
-	}
-
-	// based on ask
-	switch {
-	case this.Side == SideSell && this.StopPrice.LessThan(that.StopPrice):
-		result = 1
-
-	case this.Side == SideSell && this.StopPrice.GreaterThan(that.StopPrice):
-		result = -1
-
-	case this.Side == SideBuy && this.StopPrice.LessThan(that.StopPrice):
-		result = -1
-
-	case this.Side == SideBuy && this.StopPrice.GreaterThan(that.StopPrice):
-		result = 1
-
-	default:
-		switch {
-		case this.CreatedAt.Before(that.CreatedAt):
-			result = 1
-
-		case this.CreatedAt.After(that.CreatedAt):
-			result = -1
-
-		default:
-			result = utils.UInt64Comparator(this.ID, that.ID) * -1
-		}
-	}
-
-	return
+func (o *Order) Cancel() {
+	o.Cancelled = true
 }

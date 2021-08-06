@@ -1,7 +1,7 @@
 package models
 
 import (
-	"github.com/zsmartex/go-finex/config"
+	"github.com/zsmartex/finex/config"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 )

@@ -1,8 +1,9 @@
-module github.com/zsmartex/go-finex
+module github.com/zsmartex/finex
 
 go 1.16
 
 require (
+	github.com/cockroachdb/apd v1.1.0
 	github.com/dgrijalva/jwt-go v3.2.0+incompatible
 	github.com/emirpasic/gods v1.12.0
 	github.com/go-redis/redis/v8 v8.10.0

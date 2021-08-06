@@ -5,7 +5,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/shopspring/decimal"
-	"github.com/zsmartex/go-finex/types"
+	"github.com/zsmartex/finex/types"
 )
 
 type OrderEntities struct {

@@ -4,17 +4,19 @@ import (
 	"encoding/json"
 	"fmt"
 	"strconv"
+	"sync"
 
 	"github.com/shopspring/decimal"
-	"github.com/zsmartex/go-finex/config"
-	"github.com/zsmartex/go-finex/matching"
-	"github.com/zsmartex/go-finex/models"
-	"github.com/zsmartex/go-finex/types"
+	"github.com/zsmartex/finex/config"
+	"github.com/zsmartex/finex/matching"
+	"github.com/zsmartex/finex/models"
+	"github.com/zsmartex/finex/types"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 )
 
 type TradeExecutorWorker struct {
+	ExecutorMutex sync.RWMutex
 }
 
 type TradeExecutor struct {
@@ -28,6 +30,9 @@ func NewTradeExecutorWorker() *TradeExecutorWorker {
 }
 
 func (w *TradeExecutorWorker) Process(payload []byte) error {
+	w.ExecutorMutex.Lock()
+	defer w.ExecutorMutex.Unlock()
+
 	trade_executor := &TradeExecutor{
 		MakerOrder: &models.Order{},
 		TakerOrder: &models.Order{},

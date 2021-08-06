@@ -6,9 +6,9 @@ import (
 	"time"
 
 	"github.com/streadway/amqp"
-	"github.com/zsmartex/go-finex/config"
-	"github.com/zsmartex/go-finex/mq_client"
-	"github.com/zsmartex/go-finex/workers/engines"
+	"github.com/zsmartex/finex/config"
+	"github.com/zsmartex/finex/mq_client"
+	"github.com/zsmartex/finex/workers/engines"
 )
 
 var Queue = &[]amqp.Queue{}
@@ -73,7 +73,7 @@ func main() {
 				continue
 			}
 
-			config.Logger.Infof("Receive message: %s", string(m.Data))
+			// config.Logger.Infof("Receive message: %s", string(m.Data))
 			if err := worker.Process(m.Data); err == nil {
 				m.Ack()
 			} else {

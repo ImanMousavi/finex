@@ -4,7 +4,7 @@ import (
 	"time"
 
 	"github.com/shopspring/decimal"
-	"github.com/zsmartex/go-finex/config"
+	"github.com/zsmartex/finex/config"
 )
 
 type Liability struct {

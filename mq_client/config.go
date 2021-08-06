@@ -6,7 +6,7 @@ import (
 	"reflect"
 
 	"github.com/streadway/amqp"
-	"github.com/zsmartex/go-finex/config"
+	"github.com/zsmartex/finex/config"
 	"gopkg.in/yaml.v2"
 )
 

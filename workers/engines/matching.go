@@ -4,9 +4,9 @@ import (
 	"encoding/json"
 	"errors"
 
-	"github.com/zsmartex/go-finex/config"
-	"github.com/zsmartex/go-finex/matching"
-	"github.com/zsmartex/go-finex/models"
+	"github.com/zsmartex/finex/config"
+	"github.com/zsmartex/finex/matching"
+	"github.com/zsmartex/finex/models"
 )
 
 type MatchingPayloadMessage struct {
@@ -62,7 +62,8 @@ func (w MatchingWorker) SubmitOrder(order *matching.Order) error {
 		return errors.New("engine is not ready")
 	}
 
-	return engine.Submit(order)
+	engine.Submit(order)
+	return nil
 }
 
 func (w MatchingWorker) CancelOrder(order *matching.Order) error {
@@ -76,7 +77,8 @@ func (w MatchingWorker) CancelOrder(order *matching.Order) error {
 		return errors.New("engine is not ready")
 	}
 
-	return engine.Cancel(order)
+	engine.Cancel(order)
+	return nil
 }
 
 func (w MatchingWorker) GetEngineByMarket(market string) *matching.Engine {
@@ -125,7 +127,6 @@ func (w MatchingWorker) LoadOrders(engine *matching.Engine) {
 	config.DataBase.Where("market_id = ? AND state = ?", engine.Market, models.StateWait).Order("id asc").Find(&orders)
 
 	for _, order := range orders {
-		mOrder := w.BuildOrder(order.ToMatchingAttributes())
-		engine.Submit(mOrder)
+		engine.Submit(order.ToMatchingAttributes())
 	}
 }

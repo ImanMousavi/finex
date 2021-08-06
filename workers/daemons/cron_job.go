@@ -3,8 +3,8 @@ package daemons
 import (
 	"time"
 
-	"github.com/zsmartex/go-finex/jobs"
-	"github.com/zsmartex/go-finex/jobs/cron"
+	"github.com/zsmartex/finex/jobs"
+	"github.com/zsmartex/finex/jobs/cron"
 )
 
 type CronJob struct {

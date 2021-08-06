@@ -2,7 +2,7 @@ package helpers
 
 import (
 	"github.com/gookit/validate"
-	"github.com/zsmartex/go-finex/types"
+	"github.com/zsmartex/finex/types"
 )
 
 type Errors struct {

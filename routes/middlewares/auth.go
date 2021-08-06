@@ -8,8 +8,8 @@ import (
 
 	"github.com/dgrijalva/jwt-go"
 	"github.com/gofiber/fiber/v2"
-	"github.com/zsmartex/go-finex/config"
-	"github.com/zsmartex/go-finex/models"
+	"github.com/zsmartex/finex/config"
+	"github.com/zsmartex/finex/models"
 )
 
 var (

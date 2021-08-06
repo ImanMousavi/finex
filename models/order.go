@@ -14,12 +14,12 @@ import (
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 
-	"github.com/zsmartex/go-finex/config"
-	"github.com/zsmartex/go-finex/controllers/entities"
-	"github.com/zsmartex/go-finex/matching"
-	"github.com/zsmartex/go-finex/models/concerns"
-	"github.com/zsmartex/go-finex/mq_client"
-	"github.com/zsmartex/go-finex/types"
+	"github.com/zsmartex/finex/config"
+	"github.com/zsmartex/finex/controllers/entities"
+	"github.com/zsmartex/finex/matching"
+	"github.com/zsmartex/finex/models/concerns"
+	"github.com/zsmartex/finex/mq_client"
+	"github.com/zsmartex/finex/types"
 )
 
 var precision_validator = &concerns.PrecisionValidator{}
@@ -528,24 +528,32 @@ func FloatToString(input_num float64) string {
 	return strconv.FormatFloat(input_num, 'f', 6, 64)
 }
 
-func (o *Order) ToMatchingAttributes() map[string]interface{} {
-	var side matching.Side
+func (o *Order) ToMatchingAttributes() *matching.Order {
+	var side matching.OrderSide
 	if o.Type == SideBuy {
 		side = matching.SideBuy
 	} else {
 		side = matching.SideSell
 	}
 
-	return map[string]interface{}{
-		"id":                  o.ID,
-		"symbol":              o.MarketID,
-		"member_id":           o.MemberID,
-		"side":                side,
-		"price":               o.Price.Decimal,
-		"stop_price":          o.StopPrice.Decimal,
-		"quantity":            o.OriginVolume,
-		"filled_quantity":     o.OriginVolume.Sub(o.Volume),
-		"immediate_or_cancel": o.State == StateCancel || o.State == StateDone || o.State == StateReject,
-		"created_at":          o.CreatedAt,
+	var orderType matching.OrderType
+	if o.OrdType == types.TypeLimit {
+		orderType = matching.TypeLimit
+	} else if o.OrdType == types.TypeMarket {
+		orderType = matching.TypeMarket
+	}
+
+	return &matching.Order{
+		ID:             o.ID,
+		Symbol:         o.MarketID,
+		MemberID:       o.MemberID,
+		Type:           orderType,
+		Price:          o.Price.Decimal,
+		StopPrice:      o.StopPrice.Decimal,
+		Quantity:       o.OriginVolume,
+		FilledQuantity: o.OriginVolume.Sub(o.Volume),
+		Side:           side,
+		Cancelled:      o.State == StateCancel || o.State == StateDone,
+		CreatedAt:      o.CreatedAt,
 	}
 }

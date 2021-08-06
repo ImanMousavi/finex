@@ -4,9 +4,9 @@ import (
 	"github.com/gookit/validate"
 	"github.com/shopspring/decimal"
 
-	"github.com/zsmartex/go-finex/config"
-	"github.com/zsmartex/go-finex/models"
-	"github.com/zsmartex/go-finex/types"
+	"github.com/zsmartex/finex/config"
+	"github.com/zsmartex/finex/models"
+	"github.com/zsmartex/finex/types"
 )
 
 type CreateOrderParams struct {

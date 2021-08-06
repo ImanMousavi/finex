@@ -4,7 +4,7 @@ import (
 	"time"
 
 	"github.com/shopspring/decimal"
-	"github.com/zsmartex/go-finex/types"
+	"github.com/zsmartex/finex/types"
 )
 
 type TradeEntities struct {

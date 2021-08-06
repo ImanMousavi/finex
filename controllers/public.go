@@ -6,10 +6,10 @@ import (
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/shopspring/decimal"
-	"github.com/zsmartex/go-finex/config"
-	"github.com/zsmartex/go-finex/controllers/helpers"
-	"github.com/zsmartex/go-finex/controllers/queries"
-	"github.com/zsmartex/go-finex/types"
+	"github.com/zsmartex/finex/config"
+	"github.com/zsmartex/finex/controllers/helpers"
+	"github.com/zsmartex/finex/controllers/queries"
+	"github.com/zsmartex/finex/types"
 )
 
 func GetTimestamp(c *fiber.Ctx) error {
@@ -51,7 +51,7 @@ func GetDepth(c *fiber.Ctx) error {
 		"market": market,
 		"limit":  params.Limit,
 	})
-	msg, err := config.Nats.Request("depth:"+market, payload, 10*time.Millisecond)
+	msg, err := config.Nats.Request("finex:depth:"+market, payload, 10*time.Millisecond)
 
 	if err != nil {
 		return c.Status(200).JSON(depth)

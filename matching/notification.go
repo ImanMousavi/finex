@@ -5,11 +5,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/go-redis/redis/v8"
-	"github.com/nats-io/nats.go"
 	"github.com/shopspring/decimal"
-	"github.com/zsmartex/go-finex/config"
-	"github.com/zsmartex/go-finex/mq_client"
+	"github.com/zsmartex/finex/config"
+	"github.com/zsmartex/finex/mq_client"
 )
 
 type DepthJSON struct {
@@ -19,21 +17,15 @@ type DepthJSON struct {
 }
 
 type Book struct {
-	Asks map[decimal.Decimal]decimal.Decimal
-	Bids map[decimal.Decimal]decimal.Decimal
+	Asks [][]decimal.Decimal
+	Bids [][]decimal.Decimal
 }
 
 type Notification struct {
 	Symbol      string // instrument name
 	Sequence    uint64
-	Book        *Book // cache for fetch depth
 	BookCache   *Book // cache for notify to websocket
 	NotifyMutex sync.RWMutex
-}
-
-type GetDepthPayload struct {
-	Market string `json:"market"`
-	Limit  int    `json:"limit"`
 }
 
 func NewNotification(symbol string) *Notification {
@@ -41,77 +33,20 @@ func NewNotification(symbol string) *Notification {
 		Symbol:   symbol,
 		Sequence: 0,
 		BookCache: &Book{
-			Asks: make(map[decimal.Decimal]decimal.Decimal),
-			Bids: make(map[decimal.Decimal]decimal.Decimal),
-		},
-		Book: &Book{
-			Asks: make(map[decimal.Decimal]decimal.Decimal),
-			Bids: make(map[decimal.Decimal]decimal.Decimal),
+			Asks: make([][]decimal.Decimal, 0),
+			Bids: make([][]decimal.Decimal, 0),
 		},
 	}
 
 	config.Redis.GetKey("finex:"+symbol+":depth:sequence", &notification.Sequence)
+
 	notification.Start()
-	notification.SubscribeFetch()
 
 	return notification
 }
 
 func (n *Notification) Start() {
 	go n.StartLoop()
-}
-
-func (n *Notification) SubscribeFetch() {
-	config.Nats.Subscribe("depth:"+n.Symbol, func(m *nats.Msg) {
-		n.NotifyMutex.RLock()
-
-		var payload GetDepthPayload
-		json.Unmarshal(m.Data, &payload)
-
-		asks_depth := make([][]decimal.Decimal, 0)
-		bids_depth := make([][]decimal.Decimal, 0)
-
-		var i = 0
-		for price, amount := range n.Book.Asks {
-			asks_depth = append(asks_depth, []decimal.Decimal{price, amount})
-			i++
-			if i == payload.Limit {
-				break
-			}
-		}
-		i = 0
-		var priceLst []decimal.Decimal
-		var reversed []decimal.Decimal
-		for price := range n.Book.Bids {
-			priceLst = append(priceLst, price)
-		}
-		for i := range priceLst {
-			n := priceLst[len(priceLst)-1-i]
-			reversed = append(reversed, n)
-		}
-		for i = 0; i < len(priceLst); i++ {
-			price := priceLst[i]
-			amount := n.Book.Bids[price]
-			bids_depth = append(bids_depth, []decimal.Decimal{price, amount})
-			i++
-			if i == payload.Limit {
-				break
-			}
-		}
-
-		depth_message, err := json.Marshal(DepthJSON{
-			Asks:     asks_depth,
-			Bids:     bids_depth,
-			Sequence: n.Sequence,
-		})
-
-		if err != nil {
-			config.Logger.Errorf("Error: %s", err.Error())
-		}
-
-		m.Respond(depth_message)
-		n.NotifyMutex.RUnlock()
-	})
 }
 
 func (n *Notification) StartLoop() {
@@ -135,17 +70,13 @@ func (n *Notification) StartLoop() {
 		n.NotifyMutex.Lock()
 
 		n.Sequence++
-		config.Redis.SetKey("finex:"+n.Symbol+":depth:sequence", n.Sequence, redis.KeepTTL)
+		config.Redis.SetKey("finex:"+n.Symbol+":depth:sequence", n.Sequence, 0)
 
 		asks_depth := make([][]decimal.Decimal, 0)
 		bids_depth := make([][]decimal.Decimal, 0)
 
-		for price, amount := range n.BookCache.Asks {
-			asks_depth = append(asks_depth, []decimal.Decimal{price, amount})
-		}
-		for price, amount := range n.BookCache.Bids {
-			bids_depth = append(bids_depth, []decimal.Decimal{price, amount})
-		}
+		asks_depth = append(asks_depth, n.BookCache.Asks...)
+		bids_depth = append(bids_depth, n.BookCache.Bids...)
 
 		payload := DepthJSON{
 			Asks:     asks_depth,
@@ -163,51 +94,35 @@ func (n *Notification) StartLoop() {
 			config.Logger.Errorf("Error: %s", err.Error())
 		}
 
-		n.BookCache.Asks = make(map[decimal.Decimal]decimal.Decimal)
-		n.BookCache.Bids = make(map[decimal.Decimal]decimal.Decimal)
+		n.BookCache.Asks = make([][]decimal.Decimal, 0)
+		n.BookCache.Bids = make([][]decimal.Decimal, 0)
 		n.NotifyMutex.Unlock()
 	}
 }
 
-func (n *Notification) Publish(side Side, price, amount decimal.Decimal) {
+func (n *Notification) Publish(side OrderSide, price, amount decimal.Decimal) {
 	n.NotifyMutex.Lock()
 	defer n.NotifyMutex.Unlock()
 
 	if side == SideBuy {
-		for bprice := range n.BookCache.Bids {
-			if price.Equal(bprice) {
-				delete(n.BookCache.Bids, bprice)
+		for _, o := range n.BookCache.Bids {
+			if o[0].Equal(price) {
+				o[1] = amount
+
+				return
 			}
 		}
 
-		n.BookCache.Bids[price] = amount
-
-		for bprice := range n.Book.Bids {
-			if price.Equal(bprice) {
-				delete(n.Book.Bids, bprice)
-			}
-		}
-
-		if amount.IsPositive() {
-			n.Book.Bids[price] = amount
-		}
+		n.BookCache.Bids = append(n.BookCache.Bids, []decimal.Decimal{price, amount})
 	} else {
-		for bprice := range n.BookCache.Asks {
-			if price.Equal(bprice) {
-				delete(n.BookCache.Asks, bprice)
+		for _, o := range n.BookCache.Asks {
+			if o[0].Equal(price) {
+				o[1] = amount
+
+				return
 			}
 		}
 
-		n.BookCache.Asks[price] = amount
-
-		for bprice := range n.Book.Asks {
-			if price.Equal(bprice) {
-				delete(n.Book.Asks, bprice)
-			}
-		}
-
-		if amount.IsPositive() {
-			n.Book.Asks[price] = amount
-		}
+		n.BookCache.Asks = append(n.BookCache.Asks, []decimal.Decimal{price, amount})
 	}
 }

@@ -7,8 +7,8 @@ type OrderQueue struct {
 }
 
 // NewOrderQueue returns an order queue.
-func NewOrderQueue(size int64) OrderQueue {
-	return OrderQueue{
+func NewOrderQueue(size int64) *OrderQueue {
+	return &OrderQueue{
 		size:   size,
 		values: make([]*Order, 0, size),
 	}
