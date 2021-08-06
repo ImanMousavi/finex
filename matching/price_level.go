@@ -6,10 +6,13 @@ import (
 	"github.com/shopspring/decimal"
 )
 
+type onChange func(side OrderSide, price decimal.Decimal, amount decimal.Decimal)
+
 type PriceLevel struct {
-	Side   OrderSide
-	Price  decimal.Decimal
-	Orders []*Order
+	Side     OrderSide
+	Price    decimal.Decimal
+	Orders   []*Order
+	onChange onChange
 }
 
 type PriceLevelKey struct {
@@ -17,11 +20,12 @@ type PriceLevelKey struct {
 	Price decimal.Decimal
 }
 
-func NewPriceLevel(side OrderSide, price decimal.Decimal) *PriceLevel {
+func NewPriceLevel(side OrderSide, price decimal.Decimal, onChange onChange) *PriceLevel {
 	return &PriceLevel{
-		Side:   side,
-		Price:  price,
-		Orders: make([]*Order, 0),
+		Side:     side,
+		Price:    price,
+		Orders:   make([]*Order, 0),
+		onChange: onChange,
 	}
 }
 
@@ -43,6 +47,8 @@ func (p *PriceLevel) Add(order *Order) {
 	sort.Slice(p.Orders, func(i, j int) bool {
 		return p.Orders[i].ID < p.Orders[j].ID
 	})
+
+	p.onChange(p.Side, p.Price, p.Total())
 }
 
 func (p *PriceLevel) Top() *Order {
@@ -77,4 +83,6 @@ func (p *PriceLevel) Remove(order *Order) {
 			p.Orders = append(p.Orders[:index], p.Orders[index+1:]...)
 		}
 	}
+
+	p.onChange(p.Side, p.Price, p.Total())
 }

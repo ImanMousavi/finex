@@ -41,20 +41,18 @@ func (d *Depth) Add(order *Order) {
 		price_levels = d.Bids
 	}
 
-	pl := NewPriceLevel(order.Side, order.Price)
+	pl := NewPriceLevel(order.Side, order.Price, d.Notification.Publish)
 
 	value, found := price_levels.Get(pl.Key())
 
 	if !found {
 		pl.Add(order)
 		price_levels.Put(pl.Key(), pl)
-		d.Notification.Publish(order.Side, order.Price, pl.Total())
 		return
 	}
 
 	price_level := value.(*PriceLevel)
 	price_level.Add(order)
-	d.Notification.Publish(order.Side, order.Price, price_level.Total())
 }
 
 func (d *Depth) Remove(order *Order) {
@@ -67,7 +65,7 @@ func (d *Depth) Remove(order *Order) {
 		price_levels = d.Bids
 	}
 
-	pl := NewPriceLevel(order.Side, order.Price)
+	pl := NewPriceLevel(order.Side, order.Price, d.Notification.Publish)
 
 	value, found := price_levels.Get(pl.Key())
 
@@ -77,7 +75,6 @@ func (d *Depth) Remove(order *Order) {
 
 	price_level := value.(*PriceLevel)
 	price_level.Remove(order)
-	d.Notification.Publish(order.Side, order.Price, price_level.Total())
 
 	if price_level.Size() == 0 {
 		price_levels.Remove(pl.Key())
