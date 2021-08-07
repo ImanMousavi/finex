@@ -2,6 +2,8 @@ package matching
 
 import (
 	"sync"
+
+	"github.com/shopspring/decimal"
 )
 
 type PayloadAction = string
@@ -19,11 +21,12 @@ type Engine struct {
 	Initialized   bool
 }
 
-func NewEngine(market string) *Engine {
+func NewEngine(market string, price decimal.Decimal) *Engine {
 	return &Engine{
 		Market: market,
 		OrderBook: NewOrderBook(
 			market,
+			price,
 		),
 		Initialized: false,
 	}

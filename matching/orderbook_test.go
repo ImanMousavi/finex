@@ -9,7 +9,7 @@ import (
 )
 
 func BenchmarkInsertOrder(b *testing.B) {
-	orderBook := NewOrderBook("market")
+	orderBook := NewOrderBook("market", decimal.Zero)
 
 	orders := make([]*Order, b.N)
 	for n := 0; n < b.N; n++ {

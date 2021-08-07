@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 
+	"github.com/shopspring/decimal"
 	"github.com/zsmartex/finex/config"
 	"github.com/zsmartex/finex/matching"
 	"github.com/zsmartex/finex/models"
@@ -105,7 +106,7 @@ func (w MatchingWorker) Reload(market string) {
 }
 
 func (w MatchingWorker) InitializeEngine(market string) {
-	engine := matching.NewEngine(market)
+	engine := matching.NewEngine(market, decimal.Zero)
 	w.Engines[market] = engine
 
 	w.LoadOrders(engine)

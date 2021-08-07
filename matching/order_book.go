@@ -12,6 +12,7 @@ import (
 
 type OrderBook struct {
 	matchMutex         sync.Mutex
+	orderMutex         sync.Mutex
 	Symbol             string
 	MarketPrice        decimal.Decimal
 	Depth              *Depth
@@ -68,10 +69,10 @@ func StopComparator(a, b interface{}) (result int) {
 	return
 }
 
-func NewOrderBook(symbol string) *OrderBook {
+func NewOrderBook(symbol string, market_price decimal.Decimal) *OrderBook {
 	return &OrderBook{
 		Symbol:             symbol,
-		MarketPrice:        decimal.Zero,
+		MarketPrice:        market_price,
 		Depth:              NewDepth(symbol),
 		StopBids:           redblacktree.NewWith(StopComparator),
 		StopAsks:           redblacktree.NewWith(StopComparator),
@@ -133,6 +134,8 @@ func (o *OrderBook) setMarketPrice(newPrice decimal.Decimal) {
 }
 
 func (o *OrderBook) Add(order *Order) {
+	o.orderMutex.Lock()
+	defer o.orderMutex.Unlock()
 	if order.StopPrice.IsPositive() {
 		var book *redblacktree.Tree
 		switch order.Side {
@@ -166,6 +169,8 @@ func (o *OrderBook) Add(order *Order) {
 }
 
 func (o *OrderBook) Remove(order *Order) {
+	o.orderMutex.Lock()
+	defer o.orderMutex.Unlock()
 	o.Depth.Remove(order)
 	o.PublishCancel(order)
 }

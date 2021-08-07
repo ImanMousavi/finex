@@ -2,6 +2,7 @@ package matching
 
 import (
 	"sort"
+	"sync"
 
 	"github.com/shopspring/decimal"
 )
@@ -9,6 +10,7 @@ import (
 type onChange func(side OrderSide, price decimal.Decimal, amount decimal.Decimal)
 
 type PriceLevel struct {
+	sync.Mutex
 	Side     OrderSide
 	Price    decimal.Decimal
 	Orders   []*Order
@@ -37,6 +39,8 @@ func (p *PriceLevel) Key() *PriceLevelKey {
 }
 
 func (p *PriceLevel) Add(order *Order) {
+	p.Lock()
+	defer p.Unlock()
 	for _, o := range p.Orders {
 		if o.ID == order.ID {
 			return
@@ -78,6 +82,8 @@ func (p *PriceLevel) Total() decimal.Decimal {
 }
 
 func (p *PriceLevel) Remove(order *Order) {
+	p.Lock()
+	defer p.Unlock()
 	for index, o := range p.Orders {
 		if o.ID == order.ID {
 			p.Orders = append(p.Orders[:index], p.Orders[index+1:]...)
