@@ -547,12 +547,12 @@ func (o *Order) ToMatchingAttributes() *matching.Order {
 		ID:             o.ID,
 		Symbol:         o.MarketID,
 		MemberID:       o.MemberID,
+		Side:           side,
 		Type:           orderType,
 		Price:          o.Price.Decimal,
 		StopPrice:      o.StopPrice.Decimal,
 		Quantity:       o.OriginVolume,
 		FilledQuantity: o.OriginVolume.Sub(o.Volume),
-		Side:           side,
 		Cancelled:      o.State == StateCancel || o.State == StateDone,
 		CreatedAt:      o.CreatedAt,
 	}

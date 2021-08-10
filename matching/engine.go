@@ -35,6 +35,7 @@ func NewEngine(market string, price decimal.Decimal) *Engine {
 func (e *Engine) Submit(order *Order) {
 	e.MatchingMutex.Lock()
 	defer e.MatchingMutex.Unlock()
+
 	e.OrderBook.Add(order)
 }
 

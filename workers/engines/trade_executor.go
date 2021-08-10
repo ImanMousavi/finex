@@ -121,7 +121,17 @@ func (t *TradeExecutor) CreateTradeAndStrikeOrders() (*models.Trade, error) {
 		tx.Clauses(clause.Locking{
 			Strength: "UPDATE",
 			Table:    clause.Table{Name: "accounts"},
-		}).Where("member_id IN ? AND currency_id IN ?", []uint64{t.MakerOrder.MemberID, t.MakerOrder.MemberID}, []string{market.BaseUnit, market.QuoteUnit}).Find(&accounts)
+		}).Where(
+			"member_id IN ? AND currency_id IN ?",
+			[]uint64{
+				t.TakerOrder.MemberID,
+				t.MakerOrder.MemberID,
+			},
+			[]string{
+				market.BaseUnit,
+				market.QuoteUnit,
+			},
+		).Find(&accounts)
 
 		for _, account := range accounts {
 			accounts_table[account.CurrencyID+":"+strconv.FormatUint(account.MemberID, 10)] = account

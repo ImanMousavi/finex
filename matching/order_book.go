@@ -136,6 +136,7 @@ func (o *OrderBook) setMarketPrice(newPrice decimal.Decimal) {
 func (o *OrderBook) Add(order *Order) {
 	o.orderMutex.Lock()
 	defer o.orderMutex.Unlock()
+
 	if order.StopPrice.IsPositive() {
 		var book *redblacktree.Tree
 		switch order.Side {
@@ -202,15 +203,6 @@ func (o *OrderBook) Match(order *Order) {
 
 		if order.Type == TypeLimit {
 			if !order.IsCrossed(opposite_order.Price) {
-				break
-			}
-		} else if order.Type == TypeMarket {
-			total := opposite_order.Price.Mul(quantity)
-
-			if order.IsBid() && total.GreaterThan(order.Quantity) {
-				order.Cancel()
-				o.PublishCancel(order)
-
 				break
 			}
 		}

@@ -1,9 +1,10 @@
 package matching
 
 import (
-	"sort"
 	"sync"
 
+	"github.com/emirpasic/gods/trees/redblacktree"
+	"github.com/emirpasic/gods/utils"
 	"github.com/shopspring/decimal"
 )
 
@@ -13,7 +14,7 @@ type PriceLevel struct {
 	sync.Mutex
 	Side     OrderSide
 	Price    decimal.Decimal
-	Orders   []*Order
+	Orders   *redblacktree.Tree
 	onChange onChange
 }
 
@@ -26,7 +27,7 @@ func NewPriceLevel(side OrderSide, price decimal.Decimal, onChange onChange) *Pr
 	return &PriceLevel{
 		Side:     side,
 		Price:    price,
-		Orders:   make([]*Order, 0),
+		Orders:   redblacktree.NewWith(OrderComparator),
 		onChange: onChange,
 	}
 }
@@ -41,16 +42,7 @@ func (p *PriceLevel) Key() *PriceLevelKey {
 func (p *PriceLevel) Add(order *Order) {
 	p.Lock()
 	defer p.Unlock()
-	for _, o := range p.Orders {
-		if o.ID == order.ID {
-			return
-		}
-	}
-
-	p.Orders = append(p.Orders, order)
-	sort.Slice(p.Orders, func(i, j int) bool {
-		return p.Orders[i].ID < p.Orders[j].ID
-	})
+	p.Orders.Put(order.Key(), order)
 
 	p.onChange(p.Side, p.Price, p.Total())
 }
@@ -60,21 +52,23 @@ func (p *PriceLevel) Top() *Order {
 		return nil
 	}
 
-	return p.Orders[0]
+	return p.Orders.Right().Value.(*Order)
 }
 
 func (p *PriceLevel) Empty() bool {
-	return len(p.Orders) == 0
+	return p.Orders.Empty()
 }
 
 func (p *PriceLevel) Size() int {
-	return len(p.Orders)
+	return p.Orders.Size()
 }
 
 func (p *PriceLevel) Total() decimal.Decimal {
 	total := decimal.Zero
+	it := p.Orders.Iterator()
+	for it.Next() {
+		order := it.Value().(*Order)
 
-	for _, order := range p.Orders {
 		total = total.Add(order.UnfilledQuantity())
 	}
 
@@ -84,11 +78,43 @@ func (p *PriceLevel) Total() decimal.Decimal {
 func (p *PriceLevel) Remove(order *Order) {
 	p.Lock()
 	defer p.Unlock()
-	for index, o := range p.Orders {
-		if o.ID == order.ID {
-			p.Orders = append(p.Orders[:index], p.Orders[index+1:]...)
-		}
-	}
+	p.Orders.Remove(order.Key())
 
 	p.onChange(p.Side, p.Price, p.Total())
+}
+
+func OrderComparator(a, b interface{}) int {
+	aKey := a.(*OrderKey)
+	bKey := b.(*OrderKey)
+
+	if aKey.ID == bKey.ID {
+		return 0
+	}
+
+	// based on ask
+	switch {
+	case aKey.Side == SideSell && aKey.Price.LessThan(bKey.Price):
+		return 1
+
+	case aKey.Side == SideSell && aKey.Price.GreaterThan(bKey.Price):
+		return -1
+
+	case aKey.Side == SideBuy && aKey.Price.LessThan(bKey.Price):
+		return -1
+
+	case aKey.Side == SideBuy && aKey.Price.GreaterThan(bKey.Price):
+		return 1
+
+	default:
+		switch {
+		case aKey.CreatedAt.Before(bKey.CreatedAt):
+			return 1
+
+		case aKey.CreatedAt.After(bKey.CreatedAt):
+			return -1
+
+		default:
+			return utils.UInt64Comparator(aKey.ID, bKey.ID) * -1
+		}
+	}
 }
