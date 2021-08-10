@@ -51,7 +51,7 @@ func GetDepth(c *fiber.Ctx) error {
 		"market": market,
 		"limit":  params.Limit,
 	})
-	msg, err := config.Nats.Request("finex:depth:"+market, payload, 10*time.Millisecond)
+	msg, err := config.Nats.Request("finex:depth:"+market, payload, 5*time.Second)
 
 	if err != nil {
 		return c.Status(200).JSON(depth)
