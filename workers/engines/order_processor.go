@@ -4,13 +4,14 @@ import (
 	"encoding/json"
 
 	"github.com/zsmartex/finex/config"
-	"github.com/zsmartex/finex/matching"
 	"github.com/zsmartex/finex/models"
+	"github.com/zsmartex/pkg"
+	"github.com/zsmartex/pkg/order"
 )
 
 type OrderProcessorPayloadMessage struct {
-	Action matching.PayloadAction `json:"action"`
-	Order  matching.Order         `json:"order"`
+	Action pkg.PayloadAction `json:"action"`
+	Order  order.Order       `json:"order"`
 }
 
 type OrderProcessorWorker struct {
@@ -42,9 +43,9 @@ func (w OrderProcessorWorker) Process(payload []byte) error {
 	order := order_processor_payload.Order
 
 	switch order_processor_payload.Action {
-	case matching.ActionSubmit:
+	case pkg.ActionSubmit:
 		err = models.SubmitOrder(order.ID)
-	case matching.ActionCancel:
+	case pkg.ActionCancel:
 		err = models.CancelOrder(order.ID)
 	}
 

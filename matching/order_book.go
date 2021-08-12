@@ -5,9 +5,10 @@ import (
 	"sync"
 
 	"github.com/emirpasic/gods/trees/redblacktree"
-	"github.com/emirpasic/gods/utils"
 	"github.com/shopspring/decimal"
 	"github.com/zsmartex/finex/config"
+	"github.com/zsmartex/pkg/order"
+	"github.com/zsmartex/pkg/trade"
 )
 
 type OrderBook struct {
@@ -28,8 +29,8 @@ const (
 
 // StopComparator is used for comparing Key.
 func StopComparator(a, b interface{}) (result int) {
-	this := a.(*OrderKey)
-	that := b.(*OrderKey)
+	this := a.(*order.OrderKey)
+	that := b.(*order.OrderKey)
 
 	if this.Side != that.Side {
 		config.Logger.Errorf("[oceanbook.orderbook] compare order with different sides")
@@ -41,28 +42,23 @@ func StopComparator(a, b interface{}) (result int) {
 
 	// based on ask
 	switch {
-	case this.Side == SideSell && this.StopPrice.LessThan(that.StopPrice):
+	case this.Side == order.SideSell && this.StopPrice.LessThan(that.StopPrice):
 		result = 1
 
-	case this.Side == SideSell && this.StopPrice.GreaterThan(that.StopPrice):
+	case this.Side == order.SideSell && this.StopPrice.GreaterThan(that.StopPrice):
 		result = -1
 
-	case this.Side == SideBuy && this.StopPrice.LessThan(that.StopPrice):
+	case this.Side == order.SideBuy && this.StopPrice.LessThan(that.StopPrice):
 		result = -1
 
-	case this.Side == SideBuy && this.StopPrice.GreaterThan(that.StopPrice):
+	case this.Side == order.SideBuy && this.StopPrice.GreaterThan(that.StopPrice):
 		result = 1
 
 	default:
-		switch {
-		case this.CreatedAt.Before(that.CreatedAt):
+		if this.CreatedAt.Before(that.CreatedAt) {
 			result = 1
-
-		case this.CreatedAt.After(that.CreatedAt):
+		} else {
 			result = -1
-
-		default:
-			result = utils.UInt64Comparator(this.ID, that.ID) * -1
 		}
 	}
 
@@ -80,9 +76,9 @@ func NewOrderBook(symbol string, market_price decimal.Decimal) *OrderBook {
 	}
 }
 
-func (o *OrderBook) setMarketPrice(newPrice decimal.Decimal) {
-	previousPrice := o.MarketPrice
-	o.MarketPrice = newPrice
+func (ob *OrderBook) setMarketPrice(newPrice decimal.Decimal) {
+	previousPrice := ob.MarketPrice
+	ob.MarketPrice = newPrice
 
 	if previousPrice.IsZero() {
 		return
@@ -92,39 +88,39 @@ func (o *OrderBook) setMarketPrice(newPrice decimal.Decimal) {
 	case newPrice.LessThan(previousPrice):
 		// price gone done, check stop asks
 		for {
-			best := o.StopBids.Right()
+			best := ob.StopBids.Right()
 			if best == nil {
 				break
 			}
 
-			bestOrder := best.Value.(*Order)
+			bestOrder := best.Value.(*order.Order)
 			if bestOrder.StopPrice.LessThan(newPrice) {
 				break
 			}
 
 			config.Logger.Debugf("[oceanbook.orderbook] bid order %d with stop price %s enqueued", bestOrder.ID, bestOrder.Price)
 
-			o.StopBids.Remove(best.Key)
-			o.pendingOrdersQueue.Push(bestOrder)
+			ob.StopBids.Remove(best.Key)
+			ob.pendingOrdersQueue.Push(bestOrder)
 		}
 
 	case newPrice.GreaterThan(previousPrice):
 		// price gone done, check stop asks
 		for {
-			best := o.StopAsks.Right()
+			best := ob.StopAsks.Right()
 			if best == nil {
 				break
 			}
 
-			bestOrder := best.Value.(*Order)
+			bestOrder := best.Value.(*order.Order)
 			if bestOrder.StopPrice.GreaterThan(newPrice) {
 				break
 			}
 
 			config.Logger.Debugf("[oceanbook.orderbook] ask order %d with stop price %s enqueued", bestOrder.ID, bestOrder.Price)
 
-			o.StopAsks.Remove(best.Key)
-			o.pendingOrdersQueue.Push(bestOrder)
+			ob.StopAsks.Remove(best.Key)
+			ob.pendingOrdersQueue.Push(bestOrder)
 		}
 
 	default:
@@ -133,58 +129,57 @@ func (o *OrderBook) setMarketPrice(newPrice decimal.Decimal) {
 	}
 }
 
-func (o *OrderBook) Add(order *Order) {
-	o.orderMutex.Lock()
-	defer o.orderMutex.Unlock()
+func (ob *OrderBook) Add(o *order.Order) {
+	ob.orderMutex.Lock()
+	defer ob.orderMutex.Unlock()
 
-	if order.StopPrice.IsPositive() {
+	if o.StopPrice.IsPositive() {
 		var book *redblacktree.Tree
-		switch order.Side {
-		case SideSell:
-			book = o.StopAsks
-		case SideBuy:
-			book = o.StopBids
+		switch o.Side {
+		case order.SideSell:
+			book = ob.StopAsks
+		case order.SideBuy:
+			book = ob.StopBids
 		}
 
-		_, found := book.Get(order.Key())
+		_, found := book.Get(o.Key())
 		if found {
 			return
 		}
 
-		book.Put(order.Key(), order)
+		book.Put(o.Key(), o)
 
 		return
 	}
 
-	o.Match(order)
+	ob.Match(o)
 
-	pendingOrders := o.pendingOrdersQueue.Values()
+	pendingOrders := ob.pendingOrdersQueue.Values()
 	for i := range pendingOrders {
 		pendingOrder := pendingOrders[i]
 
 		config.Logger.Debugf("[oceanbook.orderbook] insert stop order with id %d - %s * %s, side %s", pendingOrder.ID, pendingOrder.Price, pendingOrder.Quantity, pendingOrder.Side)
 
-		o.Match(pendingOrder)
+		ob.Match(pendingOrder)
 	}
-	o.pendingOrdersQueue.Clear()
+	ob.pendingOrdersQueue.Clear()
 }
 
-func (o *OrderBook) Remove(order *Order) {
-	o.orderMutex.Lock()
-	defer o.orderMutex.Unlock()
-	o.Depth.Remove(order)
-	o.PublishCancel(order)
+func (ob *OrderBook) Remove(key *order.OrderKey) {
+	ob.orderMutex.Lock()
+	defer ob.orderMutex.Unlock()
+	ob.Depth.Remove(key)
 }
 
-func (o *OrderBook) Match(order *Order) {
-	o.matchMutex.Lock()
-	defer o.matchMutex.Unlock()
+func (ob *OrderBook) Match(maker *order.Order) {
+	ob.matchMutex.Lock()
+	defer ob.matchMutex.Unlock()
 	var offers *redblacktree.Tree
 
-	if order.IsAsk() {
-		offers = o.Depth.Bids
+	if maker.IsAsk() {
+		offers = ob.Depth.Bids
 	} else {
-		offers = o.Depth.Asks
+		offers = ob.Depth.Asks
 	}
 
 	for {
@@ -198,56 +193,52 @@ func (o *OrderBook) Match(order *Order) {
 			continue
 		}
 
-		opposite_order := price_level.Top()
-		quantity := decimal.Min(order.UnfilledQuantity(), opposite_order.UnfilledQuantity())
+		taker := price_level.Top()
+		quantity := decimal.Min(maker.UnfilledQuantity(), taker.UnfilledQuantity())
 
-		if order.Type == TypeLimit {
-			if !order.IsCrossed(opposite_order.Price) {
+		if maker.Type == order.TypeLimit {
+			if !maker.IsCrossed(taker.Price) {
 				break
 			}
 		}
 
-		order.Fill(quantity)
-		opposite_order.Fill(quantity)
-		trade := &Trade{
-			Symbol:       o.Symbol,
-			Price:        opposite_order.Price,
-			Quantity:     quantity,
-			Total:        opposite_order.Price.Mul(quantity),
-			MakerOrderID: order.ID,
-			TakerOrderID: opposite_order.ID,
-			MakerID:      order.MemberID,
-			TakerID:      opposite_order.MemberID,
+		maker.Fill(quantity)
+		taker.Fill(quantity)
+		trade := &trade.Trade{
+			Symbol:     ob.Symbol,
+			Price:      taker.Price,
+			Quantity:   quantity,
+			Total:      taker.Price.Mul(quantity),
+			MakerOrder: maker,
+			TakerOrder: taker,
 		}
-		o.setMarketPrice(opposite_order.Price)
-		if opposite_order.Filled() {
-			o.Depth.Remove(opposite_order)
+		ob.setMarketPrice(taker.Price)
+		if taker.Filled() {
+			ob.Depth.Remove(taker.Key())
 		} else {
-			o.Depth.Add(opposite_order)
+			ob.Depth.Add(taker)
+		}
+
+		if taker.IsFake() {
+			if order_message, err := json.Marshal(taker); err == nil {
+				config.Nats.Publish("quantex:update:order", order_message)
+			}
 		}
 
 		trade_message, _ := json.Marshal(trade)
 		config.Nats.Publish("trade_executor", trade_message)
 
-		if order.Filled() {
-			break
+		if maker.Filled() {
+			return
 		}
 	}
 
-	if order.UnfilledQuantity().IsPositive() {
-		o.Depth.Add(order)
+	if maker.UnfilledQuantity().IsPositive() {
+		ob.Depth.Add(maker)
+		if maker.IsFake() {
+			if order_message, err := json.Marshal(maker); err == nil {
+				config.Nats.Publish("quantex:update:order", order_message)
+			}
+		}
 	}
-}
-
-func (o *OrderBook) PublishCancel(order *Order) error {
-	order_processor_message, err := json.Marshal(map[string]interface{}{
-		"action": ActionCancel,
-		"order":  order,
-	})
-
-	if err != nil {
-		return err
-	}
-
-	return config.Nats.Publish("order_processor", order_processor_message)
 }

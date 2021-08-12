@@ -16,10 +16,11 @@ import (
 
 	"github.com/zsmartex/finex/config"
 	"github.com/zsmartex/finex/controllers/entities"
-	"github.com/zsmartex/finex/matching"
 	"github.com/zsmartex/finex/models/concerns"
 	"github.com/zsmartex/finex/mq_client"
 	"github.com/zsmartex/finex/types"
+	"github.com/zsmartex/pkg"
+	"github.com/zsmartex/pkg/order"
 )
 
 var precision_validator = &concerns.PrecisionValidator{}
@@ -213,7 +214,7 @@ func SubmitOrder(id uint64) error {
 		tx.Save(order)
 
 		payload_matching_attrs, _ := json.Marshal(map[string]interface{}{
-			"action": matching.ActionSubmit,
+			"action": pkg.ActionSubmit,
 			"order":  order.ToMatchingAttributes(),
 		})
 		config.Nats.Publish("matching", payload_matching_attrs)
@@ -293,7 +294,7 @@ func (o *Order) Submit() error {
 	config.DataBase.Save(&o)
 
 	order_processor_payload, _ := json.Marshal(map[string]interface{}{
-		"action": matching.ActionSubmit,
+		"action": pkg.ActionSubmit,
 		"order":  o.ToMatchingAttributes(),
 	})
 
@@ -347,17 +348,17 @@ func (o Order) RecordCancelOperations() {
 }
 
 func (o *Order) AskCurrency() *Currency {
-	currency := &Currency{}
+	var currency *Currency
 
-	config.DataBase.First(currency, "id = ?", o.Ask)
+	config.DataBase.First(&currency, "id = ?", o.Ask)
 
 	return currency
 }
 
 func (o *Order) BidCurrency() *Currency {
-	currency := &Currency{}
+	var currency *Currency
 
-	config.DataBase.First(currency, "id = ?", o.Bid)
+	config.DataBase.First(&currency, "id = ?", o.Bid)
 
 	return currency
 }
@@ -528,23 +529,24 @@ func FloatToString(input_num float64) string {
 	return strconv.FormatFloat(input_num, 'f', 6, 64)
 }
 
-func (o *Order) ToMatchingAttributes() *matching.Order {
-	var side matching.OrderSide
+func (o *Order) ToMatchingAttributes() *order.Order {
+	var side order.OrderSide
 	if o.Type == SideBuy {
-		side = matching.SideBuy
+		side = order.SideBuy
 	} else {
-		side = matching.SideSell
+		side = order.SideSell
 	}
 
-	var orderType matching.OrderType
+	var orderType order.OrderType
 	if o.OrdType == types.TypeLimit {
-		orderType = matching.TypeLimit
+		orderType = order.TypeLimit
 	} else if o.OrdType == types.TypeMarket {
-		orderType = matching.TypeMarket
+		orderType = order.TypeMarket
 	}
 
-	return &matching.Order{
+	return &order.Order{
 		ID:             o.ID,
+		UUID:           o.UUID,
 		Symbol:         o.MarketID,
 		MemberID:       o.MemberID,
 		Side:           side,
@@ -554,6 +556,7 @@ func (o *Order) ToMatchingAttributes() *matching.Order {
 		Quantity:       o.OriginVolume,
 		FilledQuantity: o.OriginVolume.Sub(o.Volume),
 		Cancelled:      o.State == StateCancel || o.State == StateDone,
+		Fake:           false,
 		CreatedAt:      o.CreatedAt,
 	}
 }

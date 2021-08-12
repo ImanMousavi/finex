@@ -1,14 +1,13 @@
 package models
 
 import (
-	"encoding/json"
 	"time"
 
 	"github.com/shopspring/decimal"
 	"github.com/zsmartex/finex/config"
 	"github.com/zsmartex/finex/controllers/entities"
-	"github.com/zsmartex/finex/mq_client"
 	"github.com/zsmartex/finex/types"
+	"github.com/zsmartex/pkg/order"
 )
 
 type Trade struct {
@@ -101,26 +100,10 @@ func (t *Trade) Side(member *Member) types.TakerType {
 }
 
 func (t *Trade) OrderForMember(member *Member) *Order {
-	if member.ID == t.MakerID {
+	if member.ID == uint64(t.MakerID) {
 		return t.MakerOrder()
 	} else {
 		return t.TakerOrder()
-	}
-}
-
-func (t *Trade) TriggerEvent() {
-	maker := t.Maker()
-	taker := t.Taker()
-
-	if payload_message, err := json.Marshal(t.ToJSON(maker)); err == nil {
-		mq_client.EnqueueEvent("private", maker.UID, "trade", payload_message)
-	}
-	if payload_message, err := json.Marshal(t.ToJSON(taker)); err == nil {
-		mq_client.EnqueueEvent("private", taker.UID, "trade", payload_message)
-	}
-
-	if payload_message, err := json.Marshal(map[string]interface{}{"trades": &[]TradeGlobalJSON{t.TradeGlobalJSON()}}); err == nil {
-		mq_client.EnqueueEvent("public", t.MarketID, "trades", payload_message)
 	}
 }
 
@@ -142,97 +125,129 @@ func (t *Trade) WriteToInflux() {
 	config.InfluxDB.NewPoint("trades", tags, fields)
 }
 
-func (t *Trade) RecordCompleteOperations() {
-	seller_order := t.SellerOrder()
-	buyer_order := t.BuyerOrder()
+func (t *Trade) RecordCompleteOperations(seller_matching_order, buyer_matching_order *order.Order) {
+	var seller_order *Order
+	var buyer_order *Order
+	if !seller_matching_order.IsFake() {
+		seller_order = t.SellerOrder()
+	}
+	if !buyer_matching_order.IsFake() {
+		buyer_order = t.BuyerOrder()
+	}
 	reference := Reference{
 		ID:   t.ID,
 		Type: "Trade",
 	}
 
-	t.RecordLiabilityDebit(seller_order, buyer_order, reference)
-	t.RecordLiabilityCredit(seller_order, buyer_order, reference)
-	t.RecordLiabilityTransfer(seller_order, buyer_order, reference)
-	t.RecordRevenues(seller_order, buyer_order, reference)
+	t.RecordLiabilityDebit(seller_order, buyer_order, seller_matching_order, buyer_matching_order, reference)
+	t.RecordLiabilityCredit(seller_order, buyer_order, seller_matching_order, buyer_matching_order, reference)
+	t.RecordLiabilityTransfer(seller_order, buyer_order, seller_matching_order, buyer_matching_order, reference)
+	t.RecordRevenues(seller_order, buyer_order, seller_matching_order, buyer_matching_order, reference)
 }
 
-func (t *Trade) RecordLiabilityDebit(seller_order, buyer_order *Order, reference Reference) {
+func (t *Trade) RecordLiabilityDebit(seller_order, buyer_order *Order, seller_matching_order, buyer_matching_order *order.Order, reference Reference) {
 	seller_outcome := t.Amount
 	buyer_outcome := t.Total
 
-	LiabilityDebit(
-		seller_outcome,
-		seller_order.Currency(),
-		reference,
-		"locked",
-		seller_order.MemberID,
-	)
-	LiabilityDebit(
-		buyer_outcome,
-		buyer_order.Currency(),
-		reference,
-		"locked",
-		buyer_order.MemberID,
-	)
+	if !seller_matching_order.IsFake() {
+		LiabilityDebit(
+			seller_outcome,
+			seller_order.OutcomeCurrency(),
+			reference,
+			"locked",
+			seller_order.MemberID,
+		)
+	}
+
+	if !buyer_matching_order.IsFake() {
+		LiabilityDebit(
+			buyer_outcome,
+			buyer_order.OutcomeCurrency(),
+			reference,
+			"locked",
+			buyer_order.MemberID,
+		)
+	}
 }
 
-func (t *Trade) RecordLiabilityCredit(seller_order, buyer_order *Order, reference Reference) {
-	seller_income := t.Total.Sub(t.Total.Mul(t.OrderFee(seller_order)))
-	buyer_income := t.Amount.Sub(t.Amount.Mul(t.OrderFee(buyer_order)))
+func (t *Trade) RecordLiabilityCredit(seller_order, buyer_order *Order, seller_matching_order, buyer_matching_order *order.Order, reference Reference) {
+	if !buyer_matching_order.IsFake() {
+		buyer_income := t.Amount.Sub(t.Amount.Mul(t.OrderFee(t.BuyerOrder())))
+		LiabilityDebit(
+			buyer_income,
+			buyer_order.IncomeCurrency(),
+			reference,
+			"main",
+			buyer_order.MemberID,
+		)
+	}
 
-	LiabilityDebit(
-		buyer_income,
-		buyer_order.IncomeCurrency(),
-		reference,
-		"main",
-		buyer_order.MemberID,
-	)
-	LiabilityDebit(
-		seller_income,
-		seller_order.IncomeCurrency(),
-		reference,
-		"main",
-		seller_order.MemberID,
-	)
+	if !seller_matching_order.IsFake() {
+		seller_income := t.Total.Sub(t.Total.Mul(t.OrderFee(t.SellerOrder())))
+		LiabilityDebit(
+			seller_income,
+			seller_order.IncomeCurrency(),
+			reference,
+			"main",
+			seller_order.MemberID,
+		)
+	}
 }
 
-func (t *Trade) RecordLiabilityTransfer(seller_order, buyer_order *Order, reference Reference) {
-	orders := []*Order{seller_order, buyer_order}
-
-	for _, order := range orders {
-		if order.Volume.IsZero() || !order.Locked.IsZero() {
+// TODO: Fix it
+func (t *Trade) RecordLiabilityTransfer(seller_order, buyer_order *Order, seller_matching_order, buyer_matching_order *order.Order, reference Reference) {
+	if !seller_matching_order.IsFake() {
+		if seller_order.Volume.IsZero() || !seller_order.Locked.IsZero() {
 			LiabilityTranfer(
-				order.Locked,
-				order.OutcomeCurrency(),
+				seller_order.Locked,
+				seller_order.OutcomeCurrency(),
 				reference,
 				"locked",
 				"main",
-				order.MemberID,
+				seller_order.MemberID,
+			)
+		}
+	}
+
+	if !buyer_matching_order.IsFake() {
+		if buyer_order.Volume.IsZero() || !buyer_order.Locked.IsZero() {
+			LiabilityTranfer(
+				buyer_order.Locked,
+				buyer_order.OutcomeCurrency(),
+				reference,
+				"locked",
+				"main",
+				buyer_order.MemberID,
 			)
 		}
 	}
 }
 
-func (t *Trade) RecordRevenues(seller_order, buyer_order *Order, reference Reference) {
+func (t *Trade) RecordRevenues(seller_order, buyer_order *Order, seller_matching_order, buyer_matching_order *order.Order, reference Reference) {
 	seller_fee := t.Total.Mul(t.OrderFee(seller_order))
 	buyer_fee := t.Amount.Mul(t.OrderFee(buyer_order))
 
-	RevenueCredit(
-		seller_fee,
-		seller_order.IncomeCurrency(),
-		reference,
-		seller_order.MemberID,
-	)
-	RevenueCredit(
-		buyer_fee,
-		buyer_order.IncomeCurrency(),
-		reference,
-		buyer_order.MemberID,
-	)
+	if !seller_matching_order.IsFake() {
+		RevenueCredit(
+			seller_fee,
+			seller_order.IncomeCurrency(),
+			reference,
+			seller_order.MemberID,
+		)
+	}
+
+	if !buyer_matching_order.IsFake() {
+		RevenueCredit(
+			buyer_fee,
+			buyer_order.IncomeCurrency(),
+			reference,
+			buyer_order.MemberID,
+		)
+	}
 }
 
 func (t *Trade) OrderFee(order *Order) decimal.Decimal {
-	if t.MakerOrderID == order.ID {
+	if uint64(t.MakerOrderID) == order.ID {
 		return order.MakerFee
 	} else {
 		return order.TakerFee
@@ -270,27 +285,23 @@ func (t *Trade) ToJSON(member *Member) entities.TradeEntities {
 }
 
 type TradeGlobalJSON struct {
-	ID           uint64          `json:"id"`
-	Market       string          `json:"market"`
-	Price        decimal.Decimal `json:"price"`
-	Amount       decimal.Decimal `json:"amount"`
-	Total        decimal.Decimal `json:"total"`
-	MakerOrderID uint64          `json:"maker_order_id"`
-	TakerOrderID uint64          `json:"taker_order_id"`
-	TakerType    types.TakerType `json:"taker_type"`
-	CreatedAt    time.Time       `json:"created_at"`
+	ID        uint64          `json:"id"`
+	Market    string          `json:"market"`
+	Price     decimal.Decimal `json:"price"`
+	Amount    decimal.Decimal `json:"amount"`
+	Total     decimal.Decimal `json:"total"`
+	TakerType types.TakerType `json:"taker_type"`
+	CreatedAt time.Time       `json:"created_at"`
 }
 
 func (t *Trade) TradeGlobalJSON() TradeGlobalJSON {
 	return TradeGlobalJSON{
-		ID:           t.ID,
-		Market:       t.MarketID,
-		Price:        t.Price,
-		Amount:       t.Amount,
-		Total:        t.Total,
-		MakerOrderID: t.MakerOrderID,
-		TakerOrderID: t.TakerOrderID,
-		TakerType:    t.TakerType,
-		CreatedAt:    t.CreatedAt,
+		ID:        t.ID,
+		Market:    t.MarketID,
+		Price:     t.Price,
+		Amount:    t.Amount,
+		Total:     t.Total,
+		TakerType: t.TakerType,
+		CreatedAt: t.CreatedAt,
 	}
 }

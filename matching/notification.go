@@ -8,13 +8,9 @@ import (
 	"github.com/shopspring/decimal"
 	"github.com/zsmartex/finex/config"
 	"github.com/zsmartex/finex/mq_client"
+	"github.com/zsmartex/pkg"
+	"github.com/zsmartex/pkg/order"
 )
-
-type DepthJSON struct {
-	Asks     [][]decimal.Decimal `json:"asks"`
-	Bids     [][]decimal.Decimal `json:"bids"`
-	Sequence uint64              `json:"sequence"`
-}
 
 type Book struct {
 	Asks [][]decimal.Decimal
@@ -78,7 +74,7 @@ func (n *Notification) StartLoop() {
 		asks_depth = append(asks_depth, n.BookCache.Asks...)
 		bids_depth = append(bids_depth, n.BookCache.Bids...)
 
-		payload := DepthJSON{
+		payload := pkg.DepthJSON{
 			Asks:     asks_depth,
 			Bids:     bids_depth,
 			Sequence: n.Sequence,
@@ -100,11 +96,11 @@ func (n *Notification) StartLoop() {
 	}
 }
 
-func (n *Notification) Publish(side OrderSide, price, amount decimal.Decimal) {
+func (n *Notification) Publish(side order.OrderSide, price, amount decimal.Decimal) {
 	n.NotifyMutex.Lock()
 	defer n.NotifyMutex.Unlock()
 
-	if side == SideBuy {
+	if side == order.SideBuy {
 		for _, o := range n.BookCache.Bids {
 			if o[0].Equal(price) {
 				o[1] = amount

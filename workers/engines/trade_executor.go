@@ -6,13 +6,17 @@ import (
 	"strconv"
 	"sync"
 
-	"github.com/shopspring/decimal"
-	"github.com/zsmartex/finex/config"
-	"github.com/zsmartex/finex/matching"
-	"github.com/zsmartex/finex/models"
-	"github.com/zsmartex/finex/types"
+	"github.com/zsmartex/pkg"
+	"github.com/zsmartex/pkg/order"
+	"github.com/zsmartex/pkg/trade"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
+
+	"github.com/shopspring/decimal"
+	"github.com/zsmartex/finex/config"
+	"github.com/zsmartex/finex/models"
+	"github.com/zsmartex/finex/mq_client"
+	"github.com/zsmartex/finex/types"
 )
 
 type TradeExecutorWorker struct {
@@ -20,7 +24,7 @@ type TradeExecutorWorker struct {
 }
 
 type TradeExecutor struct {
-	TradePayload *matching.Trade
+	TradePayload *trade.Trade
 	MakerOrder   *models.Order
 	TakerOrder   *models.Order
 }
@@ -51,7 +55,7 @@ func (w *TradeExecutorWorker) Process(payload []byte) error {
 			}
 
 			matching_payload_message, err := json.Marshal(map[string]interface{}{
-				"action": matching.ActionSubmit,
+				"action": pkg.ActionSubmit,
 				"order":  order.ToMatchingAttributes(),
 			})
 
@@ -68,27 +72,47 @@ func (w *TradeExecutorWorker) Process(payload []byte) error {
 	return nil
 }
 
+func (t *TradeExecutor) IsMakerOrderFake() bool {
+	return t.TradePayload.MakerOrder.IsFake()
+}
+
+func (t *TradeExecutor) IsTakerOrderFake() bool {
+	return t.TradePayload.TakerOrder.IsFake()
+}
+
 func (t *TradeExecutor) VaildateTrade() error {
 	var ask_order *models.Order
 	var bid_order *models.Order
+	var ask_order_fake bool
+	var bid_order_fake bool
 
 	if t.MakerOrder.Type == models.SideSell {
+		ask_order_fake = t.TradePayload.MakerOrder.IsFake()
+		bid_order_fake = t.TradePayload.TakerOrder.IsFake()
 		ask_order = t.MakerOrder
 		bid_order = t.TakerOrder
 	} else {
+		ask_order_fake = t.TradePayload.TakerOrder.IsFake()
+		bid_order_fake = t.TradePayload.MakerOrder.IsFake()
 		ask_order = t.TakerOrder
 		bid_order = t.MakerOrder
 	}
 
-	if ask_order.OrdType == types.TypeLimit && ask_order.Price.Decimal.GreaterThan(t.TradePayload.Price) {
+	if !ask_order_fake && ask_order.OrdType == types.TypeLimit && ask_order.Price.Decimal.GreaterThan(t.TradePayload.Price) {
 		return fmt.Errorf("ask price exceeds strike price")
-	} else if bid_order.OrdType == types.TypeLimit && bid_order.Price.Decimal.LessThan(t.TradePayload.Price) {
+	} else if !bid_order_fake && bid_order.OrdType == types.TypeLimit && bid_order.Price.Decimal.LessThan(t.TradePayload.Price) {
 		return fmt.Errorf("bid price is less than strike price")
-	} else if t.MakerOrder.State != models.StateWait {
+	} else if !t.IsMakerOrderFake() && t.MakerOrder.State != models.StateWait {
 		return fmt.Errorf("maker order state isn't equal to «wait» (%v)", t.MakerOrder.State)
-	} else if t.TakerOrder.State != models.StateWait {
+	} else if !t.IsTakerOrderFake() && t.TakerOrder.State != models.StateWait {
 		return fmt.Errorf("taker order state isn't equal to «wait» (%v)", t.TakerOrder.State)
-	} else if !t.TradePayload.Total.IsPositive() || decimal.Min(t.MakerOrder.Volume, t.TakerOrder.Volume).LessThan(t.TradePayload.Quantity) {
+	} else if !t.TradePayload.Total.IsPositive() {
+		return fmt.Errorf("not enough funds")
+	} else if !t.IsMakerOrderFake() && !t.IsTakerOrderFake() && decimal.Min(t.MakerOrder.Volume, t.TakerOrder.Volume).LessThan(t.TradePayload.Quantity) {
+		return fmt.Errorf("not enough funds")
+	} else if !t.IsMakerOrderFake() && t.MakerOrder.Volume.LessThan(t.TradePayload.Quantity) {
+		return fmt.Errorf("not enough funds")
+	} else if !t.IsTakerOrderFake() && t.TakerOrder.Volume.LessThan(t.TradePayload.Quantity) {
 		return fmt.Errorf("not enough funds")
 	}
 
@@ -105,17 +129,42 @@ func (t *TradeExecutor) CreateTradeAndStrikeOrders() (*models.Trade, error) {
 
 		config.DataBase.First(&market, "symbol = ?", t.TradePayload.Symbol)
 
-		tx.Clauses(clause.Locking{
-			Strength: "UPDATE",
-			Table:    clause.Table{Name: "orders"},
-		}).Where("id = ?", t.TradePayload.MakerOrderID).First(t.MakerOrder)
-		tx.Clauses(clause.Locking{
-			Strength: "UPDATE",
-			Table:    clause.Table{Name: "orders"},
-		}).Where("id = ?", t.TradePayload.TakerOrderID).First(t.TakerOrder)
+		if !t.IsMakerOrderFake() {
+			tx.Clauses(clause.Locking{
+				Strength: "UPDATE",
+				Table:    clause.Table{Name: "orders"},
+			}).Where("id = ?", t.TradePayload.MakerOrder.ID).First(t.MakerOrder)
+		}
+		if !t.IsTakerOrderFake() {
+			tx.Clauses(clause.Locking{
+				Strength: "UPDATE",
+				Table:    clause.Table{Name: "orders"},
+			}).Where("id = ?", t.TradePayload.TakerOrder.ID).First(t.TakerOrder)
+		}
 
 		if err := t.VaildateTrade(); err != nil {
 			return err
+		}
+
+		// Check if accounts exists or create them.
+		if !t.IsMakerOrderFake() {
+			var af *models.Account // dont care
+			config.DataBase.FirstOrCreate(&af, models.Account{
+				MemberID:   t.MakerOrder.MemberID,
+				CurrencyID: t.MakerOrder.IncomeCurrency().ID,
+				Balance:    decimal.Zero,
+				Locked:     decimal.Zero,
+			})
+		}
+
+		if !t.IsTakerOrderFake() {
+			var af *models.Account // dont care
+			config.DataBase.FirstOrCreate(&af, models.Account{
+				MemberID:   t.TakerOrder.MemberID,
+				CurrencyID: t.TakerOrder.IncomeCurrency().ID,
+				Balance:    decimal.Zero,
+				Locked:     decimal.Zero,
+			})
 		}
 
 		tx.Clauses(clause.Locking{
@@ -124,8 +173,8 @@ func (t *TradeExecutor) CreateTradeAndStrikeOrders() (*models.Trade, error) {
 		}).Where(
 			"member_id IN ? AND currency_id IN ?",
 			[]uint64{
-				t.TakerOrder.MemberID,
-				t.MakerOrder.MemberID,
+				t.TradePayload.TakerOrder.MemberID,
+				t.TradePayload.MakerOrder.MemberID,
 			},
 			[]string{
 				market.BaseUnit,
@@ -137,42 +186,61 @@ func (t *TradeExecutor) CreateTradeAndStrikeOrders() (*models.Trade, error) {
 			accounts_table[account.CurrencyID+":"+strconv.FormatUint(account.MemberID, 10)] = account
 		}
 
+		var side types.TakerType
+		if t.TradePayload.TakerOrder.Side == order.SideSell {
+			side = types.TypeSell
+		} else {
+			side = types.TypeBuy
+		}
+
 		trade = &models.Trade{
 			Price:        t.TradePayload.Price,
 			Amount:       t.TradePayload.Quantity,
 			Total:        t.TradePayload.Total,
-			MakerOrderID: t.TradePayload.MakerOrderID,
-			TakerOrderID: t.TradePayload.TakerOrderID,
+			MakerOrderID: t.TradePayload.MakerOrder.ID,
+			TakerOrderID: t.TradePayload.TakerOrder.ID,
 			MarketID:     t.TradePayload.Symbol,
-			MakerID:      t.TradePayload.MakerID,
-			TakerID:      t.TradePayload.TakerID,
-			TakerType:    t.TakerOrder.Side(),
+			MakerID:      t.TradePayload.MakerOrder.MemberID,
+			TakerID:      t.TradePayload.TakerOrder.MemberID,
+			TakerType:    side,
+		}
+
+		if !t.IsMakerOrderFake() {
+			if err := t.Strike(
+				trade,
+				t.MakerOrder,
+				accounts_table[t.MakerOrder.OutcomeCurrency().ID+":"+strconv.FormatUint(t.MakerOrder.MemberID, 10)],
+				accounts_table[t.MakerOrder.IncomeCurrency().ID+":"+strconv.FormatUint(t.MakerOrder.MemberID, 10)],
+				tx,
+			); err != nil {
+				return err
+			}
+		}
+
+		if !t.IsTakerOrderFake() {
+			if err := t.Strike(
+				trade,
+				t.TakerOrder,
+				accounts_table[t.TakerOrder.OutcomeCurrency().ID+":"+strconv.FormatUint(t.TakerOrder.MemberID, 10)],
+				accounts_table[t.TakerOrder.IncomeCurrency().ID+":"+strconv.FormatUint(t.TakerOrder.MemberID, 10)],
+				tx,
+			); err != nil {
+				return err
+			}
+		}
+
+		if !t.IsMakerOrderFake() {
+			tx.Save(t.MakerOrder)
+		}
+
+		if !t.IsTakerOrderFake() {
+			tx.Save(t.TakerOrder)
 		}
 		config.DataBase.Create(trade)
 
-		if err := t.Strike(
-			trade,
-			t.MakerOrder,
-			accounts_table[t.MakerOrder.OutcomeCurrency().ID+":"+strconv.FormatUint(t.MakerOrder.MemberID, 10)],
-			accounts_table[t.MakerOrder.IncomeCurrency().ID+":"+strconv.FormatUint(t.MakerOrder.MemberID, 10)],
-			tx,
-		); err != nil {
-			return err
+		if !t.IsMakerOrderFake() && !t.IsTakerOrderFake() {
+			trade.RecordCompleteOperations(t.TradePayload.SellOrder(), t.TradePayload.BuyOrder())
 		}
-		if err := t.Strike(
-			trade,
-			t.TakerOrder,
-			accounts_table[t.TakerOrder.OutcomeCurrency().ID+":"+strconv.FormatUint(t.TakerOrder.MemberID, 10)],
-			accounts_table[t.TakerOrder.IncomeCurrency().ID+":"+strconv.FormatUint(t.TakerOrder.MemberID, 10)],
-			tx,
-		); err != nil {
-			return err
-		}
-
-		tx.Save(t.MakerOrder)
-		tx.Save(t.TakerOrder)
-
-		trade.RecordCompleteOperations()
 
 		// return nil will commit the whole transaction
 		return nil
@@ -223,6 +291,23 @@ func (t *TradeExecutor) Strike(trade *models.Trade, order *models.Order, outcome
 }
 
 func (t *TradeExecutor) PublishTrade(trade *models.Trade) {
-	trade.TriggerEvent()
+	if !t.IsMakerOrderFake() {
+		maker := trade.Maker()
+		if payload_message, err := json.Marshal(trade.ToJSON(maker)); err == nil {
+			mq_client.EnqueueEvent("private", maker.UID, "trade", payload_message)
+		}
+	}
+
+	if !t.IsTakerOrderFake() {
+		taker := trade.Taker()
+		if payload_message, err := json.Marshal(trade.ToJSON(taker)); err == nil {
+			mq_client.EnqueueEvent("private", taker.UID, "trade", payload_message)
+		}
+	}
+
+	if payload_message, err := json.Marshal(map[string]interface{}{"trades": &[]models.TradeGlobalJSON{trade.TradeGlobalJSON()}}); err == nil {
+		mq_client.EnqueueEvent("public", trade.MarketID, "trades", payload_message)
+	}
+
 	trade.WriteToInflux()
 }

@@ -8,13 +8,9 @@ import (
 	"github.com/zsmartex/finex/config"
 	"github.com/zsmartex/finex/matching"
 	"github.com/zsmartex/finex/models"
+	"github.com/zsmartex/pkg"
+	"github.com/zsmartex/pkg/order"
 )
-
-type MatchingPayloadMessage struct {
-	Action matching.PayloadAction `json:"action"`
-	Order  *matching.Order        `json:"order"`
-	Market string                 `json:"market"`
-}
 
 type MatchingWorker struct {
 	Engines map[string]*matching.Engine
@@ -31,19 +27,22 @@ func NewMatchingWorker() *MatchingWorker {
 }
 
 func (w MatchingWorker) Process(payload []byte) error {
-	var matching_payload MatchingPayloadMessage
+	var matching_payload pkg.MatchingPayloadMessage
 	if err := json.Unmarshal(payload, &matching_payload); err != nil {
 		return err
 	}
 
 	switch matching_payload.Action {
-	case matching.ActionSubmit:
+	case pkg.ActionSubmit:
 		order := matching_payload.Order
 		return w.SubmitOrder(order)
-	case matching.ActionCancel:
+	case pkg.ActionCancel:
 		order := matching_payload.Order
 		return w.CancelOrder(order)
-	case matching.ActionReload:
+	case pkg.ActionCancelWithKey:
+		key := matching_payload.Key
+		return w.CancelOrderWithKey(key)
+	case pkg.ActionReload:
 		w.Reload(matching_payload.Market)
 	default:
 		config.Logger.Fatalf("Unknown action: %s", matching_payload.Action)
@@ -52,7 +51,7 @@ func (w MatchingWorker) Process(payload []byte) error {
 	return nil
 }
 
-func (w MatchingWorker) SubmitOrder(order *matching.Order) error {
+func (w MatchingWorker) SubmitOrder(order *order.Order) error {
 	engine := w.Engines[order.Symbol]
 
 	if engine == nil {
@@ -67,7 +66,22 @@ func (w MatchingWorker) SubmitOrder(order *matching.Order) error {
 	return nil
 }
 
-func (w MatchingWorker) CancelOrder(order *matching.Order) error {
+func (w MatchingWorker) CancelOrderWithKey(key *order.OrderKey) error {
+	engine := w.Engines[key.Symbol]
+
+	if engine == nil {
+		return errors.New("engine not found")
+	}
+
+	if !engine.Initialized {
+		return errors.New("engine is not ready")
+	}
+
+	engine.CancelWithKey(key)
+	return nil
+}
+
+func (w MatchingWorker) CancelOrder(order *order.Order) error {
 	engine := w.Engines[order.Symbol]
 
 	if engine == nil {
@@ -112,15 +126,6 @@ func (w MatchingWorker) InitializeEngine(market string) {
 	w.LoadOrders(engine)
 	engine.Initialized = true
 	config.Logger.Infof("%v engine reloaded.\n", market)
-}
-
-func (w MatchingWorker) BuildOrder(order map[string]interface{}) *matching.Order {
-	mapOrderInterfaceJSON, _ := json.Marshal(order)
-
-	var mOrder *matching.Order
-	json.Unmarshal(mapOrderInterfaceJSON, &mOrder)
-
-	return mOrder
 }
 
 func (w MatchingWorker) LoadOrders(engine *matching.Engine) {

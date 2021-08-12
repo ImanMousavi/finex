@@ -6,25 +6,26 @@ import (
 	"time"
 
 	"github.com/shopspring/decimal"
+	"github.com/zsmartex/pkg/order"
 )
 
 func BenchmarkInsertOrder(b *testing.B) {
 	orderBook := NewOrderBook("market", decimal.Zero)
 
-	orders := make([]*Order, b.N)
+	orders := make([]*order.Order, b.N)
 	for n := 0; n < b.N; n++ {
-		var side OrderSide
+		var side order.OrderSide
 		switch rand.Intn(2) {
 		case 0:
-			side = SideSell
+			side = order.SideSell
 		case 1:
-			side = SideBuy
+			side = order.SideBuy
 		}
 
 		price := rand.Intn(10)
 		quantity := rand.Intn(10) + 1
 
-		orders[n] = &Order{
+		orders[n] = &order.Order{
 			ID:        uint64(n),
 			Side:      side,
 			Price:     decimal.NewFromFloat(float64(price)),

@@ -4,31 +4,29 @@ import (
 	"sync"
 
 	"github.com/emirpasic/gods/trees/redblacktree"
-	"github.com/emirpasic/gods/utils"
 	"github.com/shopspring/decimal"
+	"github.com/zsmartex/pkg/order"
 )
 
-type onChange func(side OrderSide, price decimal.Decimal, amount decimal.Decimal)
+type onChange func(side order.OrderSide, price decimal.Decimal, amount decimal.Decimal)
 
 type PriceLevel struct {
 	sync.Mutex
-	Side     OrderSide
-	Price    decimal.Decimal
-	Orders   *redblacktree.Tree
-	onChange onChange
+	Side   order.OrderSide
+	Price  decimal.Decimal
+	Orders *redblacktree.Tree
 }
 
 type PriceLevelKey struct {
-	Side  OrderSide
+	Side  order.OrderSide
 	Price decimal.Decimal
 }
 
-func NewPriceLevel(side OrderSide, price decimal.Decimal, onChange onChange) *PriceLevel {
+func NewPriceLevel(side order.OrderSide, price decimal.Decimal) *PriceLevel {
 	return &PriceLevel{
-		Side:     side,
-		Price:    price,
-		Orders:   redblacktree.NewWith(OrderComparator),
-		onChange: onChange,
+		Side:   side,
+		Price:  price,
+		Orders: redblacktree.NewWith(OrderComparator),
 	}
 }
 
@@ -39,20 +37,29 @@ func (p *PriceLevel) Key() *PriceLevelKey {
 	}
 }
 
-func (p *PriceLevel) Add(order *Order) {
+func (p *PriceLevel) Add(order *order.Order) {
 	p.Lock()
 	defer p.Unlock()
 	p.Orders.Put(order.Key(), order)
-
-	p.onChange(p.Side, p.Price, p.Total())
 }
 
-func (p *PriceLevel) Top() *Order {
+func (p *PriceLevel) Get(key *order.OrderKey) *order.Order {
+	p.Lock()
+	defer p.Unlock()
+	value, found := p.Orders.Get(key)
+	if !found {
+		return nil
+	}
+
+	return value.(*order.Order)
+}
+
+func (p *PriceLevel) Top() *order.Order {
 	if p.Empty() {
 		return nil
 	}
 
-	return p.Orders.Right().Value.(*Order)
+	return p.Orders.Right().Value.(*order.Order)
 }
 
 func (p *PriceLevel) Empty() bool {
@@ -67,7 +74,7 @@ func (p *PriceLevel) Total() decimal.Decimal {
 	total := decimal.Zero
 	it := p.Orders.Iterator()
 	for it.Next() {
-		order := it.Value().(*Order)
+		order := it.Value().(*order.Order)
 
 		total = total.Add(order.UnfilledQuantity())
 	}
@@ -75,46 +82,25 @@ func (p *PriceLevel) Total() decimal.Decimal {
 	return total
 }
 
-func (p *PriceLevel) Remove(order *Order) {
+func (p *PriceLevel) Remove(key *order.OrderKey) {
 	p.Lock()
 	defer p.Unlock()
-	p.Orders.Remove(order.Key())
-
-	p.onChange(p.Side, p.Price, p.Total())
+	p.Orders.Remove(key)
 }
 
 func OrderComparator(a, b interface{}) int {
-	aKey := a.(*OrderKey)
-	bKey := b.(*OrderKey)
+	aKey := a.(*order.OrderKey)
+	bKey := b.(*order.OrderKey)
 
-	if aKey.ID == bKey.ID {
+	if aKey.UUID == bKey.UUID {
 		return 0
 	}
 
-	// based on ask
-	switch {
-	case aKey.Side == SideSell && aKey.Price.LessThan(bKey.Price):
+	if aKey.CreatedAt.Before(bKey.CreatedAt) {
 		return 1
-
-	case aKey.Side == SideSell && aKey.Price.GreaterThan(bKey.Price):
+	} else if aKey.CreatedAt.After(bKey.CreatedAt) {
 		return -1
-
-	case aKey.Side == SideBuy && aKey.Price.LessThan(bKey.Price):
-		return -1
-
-	case aKey.Side == SideBuy && aKey.Price.GreaterThan(bKey.Price):
-		return 1
-
-	default:
-		switch {
-		case aKey.CreatedAt.Before(bKey.CreatedAt):
-			return 1
-
-		case aKey.CreatedAt.After(bKey.CreatedAt):
-			return -1
-
-		default:
-			return utils.UInt64Comparator(aKey.ID, bKey.ID) * -1
-		}
 	}
+
+	return 0
 }

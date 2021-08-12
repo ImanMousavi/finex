@@ -10,6 +10,7 @@ import (
 	"github.com/zsmartex/finex/controllers/helpers"
 	"github.com/zsmartex/finex/controllers/queries"
 	"github.com/zsmartex/finex/types"
+	"github.com/zsmartex/pkg"
 )
 
 func GetTimestamp(c *fiber.Ctx) error {
@@ -40,16 +41,16 @@ func GetDepth(c *fiber.Ctx) error {
 		params.Limit = 100
 	}
 
-	depth := types.Depth{
+	depth := pkg.DepthJSON{
 		Asks:     [][]decimal.Decimal{},
 		Bids:     [][]decimal.Decimal{},
 		Sequence: 0,
 	}
 
 	var err error
-	payload, _ := json.Marshal(map[string]interface{}{
-		"market": market,
-		"limit":  params.Limit,
+	payload, _ := json.Marshal(pkg.GetDepthPayload{
+		Market: market,
+		Limit:  params.Limit,
 	})
 	msg, err := config.Nats.Request("finex:depth:"+market, payload, 5*time.Second)
 

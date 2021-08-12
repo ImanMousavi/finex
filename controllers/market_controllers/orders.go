@@ -12,9 +12,10 @@ import (
 	"github.com/zsmartex/finex/controllers/entities"
 	"github.com/zsmartex/finex/controllers/helpers"
 	"github.com/zsmartex/finex/controllers/queries"
-	"github.com/zsmartex/finex/matching"
 	"github.com/zsmartex/finex/models"
 	"github.com/zsmartex/finex/types"
+
+	"github.com/zsmartex/pkg"
 )
 
 func CreateOrder(c *fiber.Ctx) error {
@@ -169,7 +170,7 @@ func CancelOrderByID(c *fiber.Ctx) error {
 
 	// Doing cancel
 	payload_matching_attrs, _ := json.Marshal(map[string]interface{}{
-		"action": matching.ActionCancel,
+		"action": pkg.ActionCancel,
 		"order":  order.ToMatchingAttributes(),
 	})
 	config.Nats.Publish("matching", payload_matching_attrs)
@@ -216,7 +217,7 @@ func CancelAllOrders(c *fiber.Ctx) error {
 	for _, order := range orders {
 		// Doing cancel
 		payload_matching_attrs, _ := json.Marshal(map[string]interface{}{
-			"action": matching.ActionCancel,
+			"action": pkg.ActionCancel,
 			"order":  order.ToMatchingAttributes(),
 		})
 		config.Nats.Publish("matching", payload_matching_attrs)
