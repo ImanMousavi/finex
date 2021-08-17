@@ -125,7 +125,7 @@ func (t *Trade) WriteToInflux() {
 	config.InfluxDB.NewPoint("trades", tags, fields)
 }
 
-func (t *Trade) RecordCompleteOperations(seller_matching_order, buyer_matching_order *order.Order) {
+func (t *Trade) RecordCompleteOperations(seller_matching_order, buyer_matching_order order.Order) {
 	var seller_order *Order
 	var buyer_order *Order
 	if !seller_matching_order.IsFake() {
@@ -145,7 +145,7 @@ func (t *Trade) RecordCompleteOperations(seller_matching_order, buyer_matching_o
 	t.RecordRevenues(seller_order, buyer_order, seller_matching_order, buyer_matching_order, reference)
 }
 
-func (t *Trade) RecordLiabilityDebit(seller_order, buyer_order *Order, seller_matching_order, buyer_matching_order *order.Order, reference Reference) {
+func (t *Trade) RecordLiabilityDebit(seller_order, buyer_order *Order, seller_matching_order, buyer_matching_order order.Order, reference Reference) {
 	seller_outcome := t.Amount
 	buyer_outcome := t.Total
 
@@ -170,7 +170,7 @@ func (t *Trade) RecordLiabilityDebit(seller_order, buyer_order *Order, seller_ma
 	}
 }
 
-func (t *Trade) RecordLiabilityCredit(seller_order, buyer_order *Order, seller_matching_order, buyer_matching_order *order.Order, reference Reference) {
+func (t *Trade) RecordLiabilityCredit(seller_order, buyer_order *Order, seller_matching_order, buyer_matching_order order.Order, reference Reference) {
 	if !buyer_matching_order.IsFake() {
 		buyer_income := t.Amount.Sub(t.Amount.Mul(t.OrderFee(t.BuyerOrder())))
 		LiabilityDebit(
@@ -195,7 +195,7 @@ func (t *Trade) RecordLiabilityCredit(seller_order, buyer_order *Order, seller_m
 }
 
 // TODO: Fix it
-func (t *Trade) RecordLiabilityTransfer(seller_order, buyer_order *Order, seller_matching_order, buyer_matching_order *order.Order, reference Reference) {
+func (t *Trade) RecordLiabilityTransfer(seller_order, buyer_order *Order, seller_matching_order, buyer_matching_order order.Order, reference Reference) {
 	if !seller_matching_order.IsFake() {
 		if seller_order.Volume.IsZero() || !seller_order.Locked.IsZero() {
 			LiabilityTranfer(
@@ -223,7 +223,7 @@ func (t *Trade) RecordLiabilityTransfer(seller_order, buyer_order *Order, seller
 	}
 }
 
-func (t *Trade) RecordRevenues(seller_order, buyer_order *Order, seller_matching_order, buyer_matching_order *order.Order, reference Reference) {
+func (t *Trade) RecordRevenues(seller_order, buyer_order *Order, seller_matching_order, buyer_matching_order order.Order, reference Reference) {
 	seller_fee := t.Total.Mul(t.OrderFee(seller_order))
 	buyer_fee := t.Amount.Mul(t.OrderFee(buyer_order))
 

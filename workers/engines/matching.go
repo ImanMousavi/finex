@@ -125,7 +125,7 @@ func (w MatchingWorker) InitializeEngine(market string) {
 
 	w.LoadOrders(engine)
 	engine.Initialized = true
-	config.Logger.Infof("%v engine reloaded.\n", market)
+	config.Logger.Infof("%v engine reloaded.", market)
 }
 
 func (w MatchingWorker) LoadOrders(engine *matching.Engine) {

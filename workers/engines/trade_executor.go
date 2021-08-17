@@ -47,9 +47,19 @@ func (w *TradeExecutorWorker) Process(payload []byte) error {
 	}
 
 	trade, err := trade_executor.CreateTradeAndStrikeOrders()
-
 	if err != nil {
-		for _, order := range []*models.Order{trade_executor.MakerOrder, trade_executor.TakerOrder} {
+		var orders []*models.Order
+
+		if !trade_executor.TradePayload.MakerOrder.IsFake() {
+			orders = append(orders, trade_executor.MakerOrder)
+
+		}
+
+		if !trade_executor.TradePayload.TakerOrder.IsFake() {
+			orders = append(orders, trade_executor.TakerOrder)
+		}
+
+		for _, order := range orders {
 			if order.State != models.StateWait {
 				continue
 			}
@@ -152,8 +162,6 @@ func (t *TradeExecutor) CreateTradeAndStrikeOrders() (*models.Trade, error) {
 			config.DataBase.FirstOrCreate(&af, models.Account{
 				MemberID:   t.MakerOrder.MemberID,
 				CurrencyID: t.MakerOrder.IncomeCurrency().ID,
-				Balance:    decimal.Zero,
-				Locked:     decimal.Zero,
 			})
 		}
 
@@ -162,8 +170,6 @@ func (t *TradeExecutor) CreateTradeAndStrikeOrders() (*models.Trade, error) {
 			config.DataBase.FirstOrCreate(&af, models.Account{
 				MemberID:   t.TakerOrder.MemberID,
 				CurrencyID: t.TakerOrder.IncomeCurrency().ID,
-				Balance:    decimal.Zero,
-				Locked:     decimal.Zero,
 			})
 		}
 

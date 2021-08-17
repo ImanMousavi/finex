@@ -6,19 +6,24 @@ import (
 )
 
 type OrderFilters struct {
-	Market    string        `query:"market"`
-	BaseUnit  string        `query:"base_unit"`
-	QuoteUnit string        `query:"quote_unit"`
-	State     string        `query:"state" validate:"ValidateOrderState"`
-	Limit     int           `query:"limit" validate:"uint"`
-	Page      int           `query:"page" validate:"uint"`
-	TimeFrom  int64         `query:"time_from" validate:"uint"`
-	TimeTo    int64         `query:"time_to" validate:"uint"`
-	OrderBy   types.OrderBy `query:"order_by" validate:"ValidateOrderBy"`
+	Market    string          `query:"market"`
+	BaseUnit  string          `query:"base_unit"`
+	QuoteUnit string          `query:"quote_unit"`
+	State     string          `query:"state" validate:"ValidateOrderState"`
+	Limit     int             `query:"limit" validate:"uint"`
+	Page      int             `query:"page" validate:"uint"`
+	Type      types.OrderSide `query:"type" validate:"ValidateSide"`
+	TimeFrom  int64           `query:"time_from" validate:"uint"`
+	TimeTo    int64           `query:"time_to" validate:"uint"`
+	OrderBy   types.OrderBy   `query:"order_by" validate:"ValidateOrderBy"`
 }
 
 func (t OrderFilters) ValidateOrderBy(val types.OrderBy) bool {
 	return helpers.ValidateOrderBy(val)
+}
+
+func (t OrderFilters) ValidateSide(val types.OrderSide) bool {
+	return helpers.ValidateSide(val)
 }
 
 func (t OrderFilters) Messages() map[string]string {

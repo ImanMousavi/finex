@@ -76,6 +76,16 @@ func ValidateOrderBy(val types.OrderBy) bool {
 	return false
 }
 
+func ValidateSide(val types.OrderSide) bool {
+	if val == types.SideBuy {
+		return true
+	} else if val == types.SideSell {
+		return true
+	}
+
+	return false
+}
+
 func ValidateTakerType(val types.TakerType) bool {
 	if val == types.TypeBuy {
 		return true

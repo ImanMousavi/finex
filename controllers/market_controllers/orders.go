@@ -73,6 +73,14 @@ func GetOrders(c *fiber.Ctx) error {
 		tx = tx.Where("bid = ?", params.QuoteUnit)
 	}
 
+	if len(params.Type) > 0 {
+		if params.Type == types.SideBuy {
+			tx = tx.Where("type = ?", models.SideBuy)
+		} else {
+			tx = tx.Where("type = ?", models.SideSell)
+		}
+	}
+
 	if len(params.State) > 0 {
 		state := models.StateWait
 

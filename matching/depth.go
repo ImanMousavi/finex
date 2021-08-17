@@ -5,7 +5,6 @@ import (
 	"sync"
 
 	"github.com/emirpasic/gods/trees/redblacktree"
-	"github.com/google/uuid"
 	"github.com/nats-io/nats.go"
 	"github.com/shopspring/decimal"
 
@@ -22,7 +21,6 @@ type Depth struct {
 	Asks         *redblacktree.Tree
 	Bids         *redblacktree.Tree
 	Notification *Notification
-	fakeOrders   map[uuid.UUID]*order.OrderKey
 }
 
 func NewDepth(symbol string) *Depth {
@@ -31,7 +29,6 @@ func NewDepth(symbol string) *Depth {
 		Asks:         redblacktree.NewWith(makeComparator),
 		Bids:         redblacktree.NewWith(makeComparator),
 		Notification: NewNotification(symbol),
-		fakeOrders:   make(map[uuid.UUID]*order.OrderKey),
 	}
 
 	depth.SubscribeFetch()
@@ -48,12 +45,6 @@ func (d *Depth) Add(o *order.Order) {
 	} else {
 		price_levels = d.Bids
 	}
-
-	d.fetchOrdersMutex.Lock()
-	if o.Fake {
-		d.fakeOrders[o.UUID] = o.Key()
-	}
-	d.fetchOrdersMutex.Unlock()
 
 	pl := NewPriceLevel(o.Side, o.Price)
 
@@ -81,12 +72,6 @@ func (d *Depth) Remove(key *order.OrderKey) {
 		price_levels = d.Bids
 	}
 
-	d.fetchOrdersMutex.Lock()
-	if _, ok := d.fakeOrders[key.UUID]; !ok && key.Fake {
-		delete(d.fakeOrders, key.UUID)
-	}
-	d.fetchOrdersMutex.Unlock()
-
 	pl := NewPriceLevel(key.Side, key.Price)
 
 	value, found := price_levels.Get(pl.Key())
@@ -99,7 +84,7 @@ func (d *Depth) Remove(key *order.OrderKey) {
 	price_level.Remove(key)
 	d.Notification.Publish(price_level.Side, price_level.Price, price_level.Total())
 
-	if price_level.Size() == 0 {
+	if price_level.Empty() || price_level.Total().IsZero() {
 		price_levels.Remove(pl.Key())
 	}
 }
@@ -111,14 +96,8 @@ func (d *Depth) SubscribeFetch() {
 		defer d.fetchOrdersMutex.Unlock()
 		defer d.depthMutex.Unlock()
 
-		var payload pkg.GetFakeOrderPayload
-
-		key, ok := d.fakeOrders[payload.UUID]
-		if !ok {
-			order_message, _ := json.Marshal(nil)
-			m.Respond(order_message)
-			return
-		}
+		var key *order.OrderKey
+		json.Unmarshal(m.Data, &key)
 
 		var price_levels *redblacktree.Tree
 		if key.Side == order.SideSell {
@@ -127,7 +106,7 @@ func (d *Depth) SubscribeFetch() {
 			price_levels = d.Bids
 		}
 		pl := NewPriceLevel(key.Side, key.Price)
-		value, found := price_levels.Get(pl)
+		value, found := price_levels.Get(pl.Key())
 		if !found {
 			order_message, _ := json.Marshal(nil)
 			m.Respond(order_message)

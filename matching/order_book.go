@@ -167,7 +167,10 @@ func (ob *OrderBook) Add(o *order.Order) {
 
 func (ob *OrderBook) Remove(key *order.OrderKey) {
 	ob.orderMutex.Lock()
+	ob.matchMutex.Lock()
 	defer ob.orderMutex.Unlock()
+	defer ob.matchMutex.Unlock()
+
 	ob.Depth.Remove(key)
 }
 
@@ -194,6 +197,7 @@ func (ob *OrderBook) Match(maker *order.Order) {
 		}
 
 		taker := price_level.Top()
+
 		quantity := decimal.Min(maker.UnfilledQuantity(), taker.UnfilledQuantity())
 
 		if maker.Type == order.TypeLimit {
@@ -204,20 +208,22 @@ func (ob *OrderBook) Match(maker *order.Order) {
 
 		maker.Fill(quantity)
 		taker.Fill(quantity)
+
 		trade := &trade.Trade{
 			Symbol:     ob.Symbol,
 			Price:      taker.Price,
 			Quantity:   quantity,
 			Total:      taker.Price.Mul(quantity),
-			MakerOrder: maker,
-			TakerOrder: taker,
+			MakerOrder: *maker,
+			TakerOrder: *taker,
 		}
-		ob.setMarketPrice(taker.Price)
-		if taker.Filled() {
+
+		if taker.Filled() || taker.Cancelled {
 			ob.Depth.Remove(taker.Key())
 		} else {
 			ob.Depth.Add(taker)
 		}
+		ob.setMarketPrice(taker.Price)
 
 		if taker.IsFake() {
 			if order_message, err := json.Marshal(taker); err == nil {
