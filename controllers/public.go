@@ -58,11 +58,7 @@ func GetDepth(c *fiber.Ctx) error {
 		return c.Status(200).JSON(depth)
 	}
 
-	err = json.Unmarshal(msg.Data, &depth)
-
-	if err != nil {
-		return c.Status(200).JSON(depth)
-	}
+	json.Unmarshal(msg.Data, &depth)
 
 	return c.Status(200).JSON(depth)
 }

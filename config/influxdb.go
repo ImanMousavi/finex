@@ -4,26 +4,24 @@ import (
 	"os"
 	"time"
 
-	"github.com/influxdata/influxdb/client/v2"
+	"github.com/cbrake/influxdbhelper/v2"
+	client "github.com/influxdata/influxdb1-client/v2"
 )
 
 var InfluxDB *InfluxClient
 
 type InfluxClient struct {
-	client client.Client
+	client influxdbhelper.Client
 }
 
 func NewInfluxDB() error {
-	c, err := client.NewHTTPClient(client.HTTPConfig{
-		Addr: os.Getenv("INFLUXDB_URL"),
-	})
-
+	influx, err := influxdbhelper.NewClient(os.Getenv("INFLUXDB_URL"), "", "", "ns")
 	if err != nil {
 		return err
 	}
 
 	InfluxDB = &InfluxClient{
-		client: c,
+		client: influx.UseDB(os.Getenv("INFLUXDB_DATABASE")),
 	}
 
 	return nil
@@ -41,11 +39,13 @@ func (c *InfluxClient) NewPoint(name string, tags map[string]string, fields map[
 
 	if err != nil {
 		Logger.Errorf("Failed to create new batch point %v", err.Error())
+		return
 	}
 
 	point, err := client.NewPoint(name, tags, fields, time.Now())
 	if err != nil {
 		Logger.Errorf("Error %v", err.Error())
+		return
 	}
 
 	bp.AddPoint(point)
@@ -54,9 +54,10 @@ func (c *InfluxClient) NewPoint(name string, tags map[string]string, fields map[
 	err = c.client.Write(bp)
 	if err != nil {
 		Logger.Errorf("Error %v", err.Error())
+		return
 	}
 }
 
-func (c *InfluxClient) Query() {
-	// q := client.NewQuery("SELECT id, price, amount, total, taker_type, market, created_at FROM trades WHERE market=ethusdt", "square_holes", "ns")
+func (c *InfluxClient) Query(command string, result interface{}) error {
+	return c.client.DecodeQuery(command, result)
 }

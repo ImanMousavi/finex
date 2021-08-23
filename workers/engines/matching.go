@@ -42,6 +42,8 @@ func (w MatchingWorker) Process(payload []byte) error {
 	case pkg.ActionCancelWithKey:
 		key := matching_payload.Key
 		return w.CancelOrderWithKey(key)
+	case pkg.ActionNew:
+		w.Reload(matching_payload.Market)
 	case pkg.ActionReload:
 		w.Reload(matching_payload.Market)
 	default:
@@ -120,9 +122,14 @@ func (w MatchingWorker) Reload(market string) {
 }
 
 func (w MatchingWorker) InitializeEngine(market string) {
-	engine := matching.NewEngine(market, decimal.Zero)
-	w.Engines[market] = engine
+	lastPrice := decimal.Zero
+	trade := models.GetLastTradeFromInflux(market)
+	if trade != nil {
+		lastPrice = trade.Price
+	}
 
+	engine := matching.NewEngine(market, lastPrice)
+	w.Engines[market] = engine
 	w.LoadOrders(engine)
 	engine.Initialized = true
 	config.Logger.Infof("%v engine reloaded.", market)
@@ -131,7 +138,6 @@ func (w MatchingWorker) InitializeEngine(market string) {
 func (w MatchingWorker) LoadOrders(engine *matching.Engine) {
 	var orders []models.Order
 	config.DataBase.Where("market_id = ? AND state = ?", engine.Market, models.StateWait).Order("id asc").Find(&orders)
-
 	for _, order := range orders {
 		engine.Submit(order.ToMatchingAttributes())
 	}

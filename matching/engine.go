@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"sync"
 
+	"github.com/nats-io/nats.go"
 	"github.com/shopspring/decimal"
 	"github.com/zsmartex/finex/config"
 	"github.com/zsmartex/pkg"
@@ -18,7 +19,7 @@ type Engine struct {
 }
 
 func NewEngine(market string, price decimal.Decimal) *Engine {
-	return &Engine{
+	engine := &Engine{
 		Market: market,
 		OrderBook: NewOrderBook(
 			market,
@@ -26,6 +27,15 @@ func NewEngine(market string, price decimal.Decimal) *Engine {
 		),
 		Initialized: false,
 	}
+
+	// NOTE: dont care about this it's only work for quantex-bot
+	config.Nats.Subscribe("finex:"+market+":get_price", func(n *nats.Msg) {
+		price_message, _ := json.Marshal(engine.OrderBook.MarketPrice)
+
+		n.Respond(price_message)
+	})
+
+	return engine
 }
 
 func (e *Engine) Submit(o *order.Order) {

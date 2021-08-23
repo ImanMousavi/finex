@@ -1,6 +1,8 @@
 package models
 
 import (
+	"encoding/json"
+	"log"
 	"time"
 
 	"github.com/shopspring/decimal"
@@ -119,7 +121,7 @@ func (t *Trade) WriteToInflux() {
 		"amount":     amount,
 		"total":      total,
 		"taker_type": t.TakerType,
-		"created_at": t.CreatedAt,
+		"created_at": t.CreatedAt.Unix(),
 	}
 
 	config.InfluxDB.NewPoint("trades", tags, fields)
@@ -252,6 +254,30 @@ func (t *Trade) OrderFee(order *Order) decimal.Decimal {
 	} else {
 		return order.TakerFee
 	}
+}
+
+func GetLastTradeFromInflux(market string) *Trade {
+	var trades []map[string]interface{}
+	config.InfluxDB.Query("SELECT LAST(*) FROM \"trades\" WHERE \"market\"='"+market+"'", &trades)
+	if len(trades) > 0 {
+		log.Println(trades[0]["last_price"])
+
+		id, _ := trades[0]["last_id"].(json.Number).Int64()
+		last_price, _ := trades[0]["last_price"].(json.Number).Float64()
+		last_amount, _ := trades[0]["last_amount"].(json.Number).Float64()
+		last_total, _ := trades[0]["last_total"].(json.Number).Float64()
+		last_created_at, _ := trades[0]["last_created_at"].(json.Number).Int64()
+
+		return &Trade{
+			ID:        uint64(id),
+			Price:     decimal.NewFromFloat(last_price),
+			Amount:    decimal.NewFromFloat(last_amount),
+			Total:     decimal.NewFromFloat(last_total),
+			CreatedAt: time.Unix(last_created_at, 0),
+		}
+	}
+
+	return nil
 }
 
 func (t *Trade) ToJSON(member *Member) entities.TradeEntities {
