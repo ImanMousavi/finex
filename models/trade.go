@@ -317,7 +317,7 @@ type TradeGlobalJSON struct {
 	Amount    decimal.Decimal `json:"amount"`
 	Total     decimal.Decimal `json:"total"`
 	TakerType types.TakerType `json:"taker_type"`
-	CreatedAt time.Time       `json:"created_at"`
+	CreatedAt int64           `json:"created_at"`
 }
 
 func (t *Trade) TradeGlobalJSON() TradeGlobalJSON {
@@ -328,6 +328,6 @@ func (t *Trade) TradeGlobalJSON() TradeGlobalJSON {
 		Amount:    t.Amount,
 		Total:     t.Total,
 		TakerType: t.TakerType,
-		CreatedAt: t.CreatedAt,
+		CreatedAt: t.CreatedAt.Unix(),
 	}
 }
