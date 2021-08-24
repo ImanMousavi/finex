@@ -43,7 +43,7 @@ func (w MatchingWorker) Process(payload []byte) error {
 		key := matching_payload.Key
 		return w.CancelOrderWithKey(key)
 	case pkg.ActionNew:
-		w.Reload(matching_payload.Market)
+		w.InitializeEngine(matching_payload.Market)
 	case pkg.ActionReload:
 		w.Reload(matching_payload.Market)
 	default:
