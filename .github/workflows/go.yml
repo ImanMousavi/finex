@@ -6,6 +6,10 @@ on:
   pull_request:
     branches: [ master ]
 
+env:
+  # github.repository as <account>/<repo>
+  LOG_LEVEL: DEBUG
+
 jobs:
   build:
     runs-on: ubuntu-latest
