@@ -19,8 +19,7 @@ jobs:
 
     - name: Build
       run: |
-        go build -o quantex-api ./cmd/quantex-api/main.go
-        go build -o quantex-engine ./cmd/quantex-engine/main.go
-        go build -o quantex-migrator ./cmd/quantex-migrator/main.go
+        go build -o finex-api ./cmd/finex-api/main.go
+        go build -o finex-engine ./cmd/finex-engine/main.go
     - name: Test
       run: go test -v ./...
