@@ -24,8 +24,8 @@ func SetupRouter() *fiber.App {
 	{
 		api_v2_market.Post("/orders", market_controllers.CreateOrder)
 		api_v2_market.Get("/orders", market_controllers.GetOrders)
-		api_v2_market.Get("/orders/:id", market_controllers.GetOrderByID)
-		api_v2_market.Post("/orders/cancel/:id", market_controllers.CancelOrderByID)
+		api_v2_market.Get("/orders/:uuid", market_controllers.GetOrderByUUID)
+		api_v2_market.Post("/orders/:uuid/cancel", market_controllers.CancelOrderByUUID)
 		api_v2_market.Post("/orders/cancel", market_controllers.CancelAllOrders)
 		api_v2_market.Get("/trades", market_controllers.GetTrades)
 	}

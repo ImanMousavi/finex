@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/gofiber/fiber/v2"
+	"github.com/google/uuid"
 	"gorm.io/gorm"
 
 	"github.com/zsmartex/finex/config"
@@ -133,20 +134,19 @@ func GetOrders(c *fiber.Ctx) error {
 	return c.Status(200).JSON(orders_json)
 }
 
-func GetOrderByID(c *fiber.Ctx) error {
+func GetOrderByUUID(c *fiber.Ctx) error {
 	CurrentUser := c.Locals("CurrentUser").(*models.Member)
 
-	id, err := c.ParamsInt("id")
-	if err != nil || id <= 0 {
+	uuid, err := uuid.Parse(c.Params("uuid"))
+	if err != nil {
 		return c.Status(422).JSON(helpers.Errors{
-			Errors: []string{"market.order.invaild_id"},
+			Errors: []string{"market.order.invaild_uuid"},
 		})
 	}
 
-	order := &models.Order{}
+	var order *models.Order
 
-	result := config.DataBase.Where("id = ? AND member_id = ?", id, CurrentUser.ID).First(order)
-
+	result := config.DataBase.Where("uuid = ? AND member_id = ?", uuid, CurrentUser.ID).First(&order)
 	if errors.Is(result.Error, gorm.ErrRecordNotFound) {
 		return c.Status(404).JSON(helpers.Errors{
 			Errors: []string{"record.not_found"},
@@ -156,20 +156,19 @@ func GetOrderByID(c *fiber.Ctx) error {
 	return c.Status(200).JSON(order.ToJSON())
 }
 
-func CancelOrderByID(c *fiber.Ctx) error {
+func CancelOrderByUUID(c *fiber.Ctx) error {
 	CurrentUser := c.Locals("CurrentUser").(*models.Member)
 
-	id, err := c.ParamsInt("id")
-	if err != nil || id <= 0 {
+	uuid, err := uuid.Parse(c.Params("uuid"))
+	if err != nil {
 		return c.Status(422).JSON(helpers.Errors{
-			Errors: []string{"market.order.invaild_id"},
+			Errors: []string{"market.order.invaild_uuid"},
 		})
 	}
 
-	order := &models.Order{}
+	var order *models.Order
 
-	result := config.DataBase.Where("id = ? AND member_id = ?", id, CurrentUser.ID).First(order)
-
+	result := config.DataBase.Where("uuid = ? AND member_id = ?", uuid, CurrentUser.ID).First(&order)
 	if errors.Is(result.Error, gorm.ErrRecordNotFound) {
 		return c.Status(404).JSON(helpers.Errors{
 			Errors: []string{"record.not_found"},

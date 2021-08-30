@@ -9,7 +9,6 @@ import (
 )
 
 type OrderEntities struct {
-	ID              uint64              `json:"id"`
 	UUID            uuid.UUID           `json:"uuid"`
 	Market          string              `json:"market"`
 	Side            string              `json:"side"`
