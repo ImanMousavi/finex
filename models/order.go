@@ -506,7 +506,6 @@ func (o *Order) ToJSON() entities.OrderEntities {
 	}
 
 	return entities.OrderEntities{
-		ID:              o.ID,
 		UUID:            o.UUID,
 		Market:          o.MarketID,
 		Side:            SideString,
