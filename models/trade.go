@@ -242,29 +242,37 @@ func (t *Trade) RecordRevenues(seller_order, buyer_order *Order, seller_matching
 		for _, reward := range config.Referral.Rewards {
 			if !seller_matching_order.IsFake() && seller_fee.IsPositive() {
 				member := seller_order.Member()
-				if member.HavingReferraller() {
-					refMember := member.GetRefMember()
-					refHoldAccount := refMember.GetAccount(refCurrency)
+				if !member.HavingReferraller() {
+					break
+				}
 
-					if refHoldAccount.Balance.GreaterThanOrEqual(reward.HoldAmount) {
-						reward_amount := seller_fee.Mul(reward.Reward)
-						refMember.GetAccount(seller_order.IncomeCurrency()).PlusFunds(tx, reward_amount)
-						seller_fee = seller_fee.Sub(reward_amount)
-					}
+				refMember := member.GetRefMember()
+				refHoldAccount := refMember.GetAccount(refCurrency)
+
+				if refHoldAccount.Balance.GreaterThanOrEqual(reward.HoldAmount) {
+					reward_amount := seller_fee.Mul(reward.Reward)
+					refMember.GetAccount(seller_order.IncomeCurrency()).PlusFunds(tx, reward_amount)
+					seller_fee = seller_fee.Sub(reward_amount)
+					break
 				}
 			}
+		}
 
+		for _, reward := range config.Referral.Rewards {
 			if !buyer_matching_order.IsFake() && buyer_fee.IsPositive() {
 				member := buyer_order.Member()
 				if member.HavingReferraller() {
-					refMember := member.GetRefMember()
-					refHoldAccount := refMember.GetAccount(refCurrency)
+					break
+				}
 
-					if refHoldAccount.Balance.GreaterThanOrEqual(reward.HoldAmount) {
-						reward_amount := buyer_fee.Mul(reward.Reward)
-						refMember.GetAccount(seller_order.IncomeCurrency()).PlusFunds(tx, reward_amount)
-						buyer_fee = buyer_fee.Sub(reward_amount)
-					}
+				refMember := member.GetRefMember()
+				refHoldAccount := refMember.GetAccount(refCurrency)
+
+				if refHoldAccount.Balance.GreaterThanOrEqual(reward.HoldAmount) {
+					reward_amount := buyer_fee.Mul(reward.Reward)
+					refMember.GetAccount(seller_order.IncomeCurrency()).PlusFunds(tx, reward_amount)
+					buyer_fee = buyer_fee.Sub(reward_amount)
+					break
 				}
 			}
 		}
