@@ -37,3 +37,18 @@ const (
 	TypeLimit  OrderType = "limit"
 	TypeMarket OrderType = "market"
 )
+
+type Config struct {
+	Referral *Referral `yaml:"rewards"`
+}
+
+type Referral struct {
+	Enabled    bool                   `yaml:"enabled"`
+	CurrencyID string                 `yaml:"currency_id"`
+	Rewards    []ConfigReferralReward `yaml:"rewards"`
+}
+
+type ConfigReferralReward struct {
+	HoldAmount decimal.Decimal `yaml:"hold_amount"`
+	Reward     decimal.Decimal `yaml:"reward"`
+}

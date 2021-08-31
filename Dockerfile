@@ -1,12 +1,5 @@
 FROM golang:1.16.4-alpine AS builder
 
-RUN apk add --no-cache curl
-
-ARG KAIGARA_VERSION=0.1.24
-# Install Kaigara
-RUN curl -Lo /usr/bin/kaigara https://github.com/openware/kaigara/releases/download/${KAIGARA_VERSION}/kaigara \
-  && chmod +x /usr/bin/kaigara
-
 WORKDIR /build
 ENV CGO_ENABLED=1 \
   GOOS=linux \
@@ -26,8 +19,8 @@ FROM alpine:3.12.7
 RUN apk add ca-certificates
 WORKDIR /app
 
-COPY --from=builder /build/config ./config
+COPY --from=builder /build/config/config.yaml ./config/config.yaml
+COPY --from=builder /build/config/amqp.yml ./config/amqp.yml
 COPY --from=builder /build/finex-api ./
 COPY --from=builder /build/finex-engine ./
 COPY --from=builder /build/finex-daemon ./
-COPY --from=builder /usr/bin/kaigara /usr/bin/kaigara

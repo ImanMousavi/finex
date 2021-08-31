@@ -236,16 +236,16 @@ func (t *TradeExecutor) CreateTradeAndStrikeOrders() (*models.Trade, error) {
 		}
 
 		if !t.IsMakerOrderFake() {
-			tx.Save(t.MakerOrder)
+			tx.Save(&t.MakerOrder)
 		}
 
 		if !t.IsTakerOrderFake() {
-			tx.Save(t.TakerOrder)
+			tx.Save(&t.TakerOrder)
 		}
-		config.DataBase.Create(trade)
+		tx.Create(&trade)
 
 		if !t.IsMakerOrderFake() && !t.IsTakerOrderFake() {
-			trade.RecordCompleteOperations(t.TradePayload.SellOrder(), t.TradePayload.BuyOrder())
+			trade.RecordCompleteOperations(t.TradePayload.SellOrder(), t.TradePayload.BuyOrder(), tx)
 		}
 
 		// return nil will commit the whole transaction

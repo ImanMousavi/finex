@@ -21,10 +21,22 @@ type Member struct {
 	UpdatedAt   time.Time      `json:"updated_at"`
 }
 
-func (m Member) GetAccount(currency *Currency) *Account {
-	account := &Account{}
+func (m *Member) GetAccount(currency *Currency) *Account {
+	var account *Account
 
-	config.DataBase.FirstOrCreate(account, Account{MemberID: m.ID, CurrencyID: currency.ID})
+	config.DataBase.FirstOrCreate(&account, Account{MemberID: m.ID, CurrencyID: currency.ID})
 
 	return account
+}
+
+func (m *Member) HavingReferraller() bool {
+	return m.ReferralUID.Valid
+}
+
+func (m *Member) GetRefMember() *Member {
+	var member *Member
+
+	config.DataBase.First(&member, "uid = ?", m.ReferralUID)
+
+	return member
 }
