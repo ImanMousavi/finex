@@ -157,9 +157,9 @@ func (o *Order) Market() *Market {
 }
 
 func (o *Order) Member() *Member {
-	member := &Member{}
+	var member *Member
 
-	config.DataBase.Find(member, o.MemberID)
+	config.DataBase.First(&member, o.MemberID)
 
 	return member
 }
@@ -206,7 +206,9 @@ func SubmitOrder(id uint64) error {
 
 		account_tx := tx.Clauses(clause.Locking{Strength: "UPDATE", Table: clause.Table{Name: "accounts"}})
 		account_tx.Where("member_id = ? AND currency_id = ?", order.MemberID, order.Currency().ID).FirstOrCreate(account)
-		account.LockFunds(account_tx, order.Locked)
+		if err := account.LockFunds(account_tx, order.Locked); err != nil {
+			return err
+		}
 
 		order.RecordSubmitOperations()
 
@@ -253,7 +255,9 @@ func CancelOrder(id uint64) error {
 
 		account_tx := tx.Clauses(clause.Locking{Strength: "UPDATE", Table: clause.Table{Name: "accounts"}})
 		account_tx.Where("member_id = ? AND currency_id = ?", order.MemberID, order.Currency().ID).FirstOrCreate(account)
-		account.UnlockFunds(tx, order.Locked)
+		if err := account.UnlockFunds(tx, order.Locked); err != nil {
+			return err
+		}
 
 		order.RecordCancelOperations()
 

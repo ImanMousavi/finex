@@ -52,3 +52,10 @@ type ConfigReferralReward struct {
 	HoldAmount decimal.Decimal `yaml:"hold_amount"`
 	Reward     decimal.Decimal `yaml:"reward"`
 }
+
+type MarketState string
+
+var (
+	MarketStateEndabled MarketState = "endabled"
+	MarketStateDisabled MarketState = "disabled"
+)

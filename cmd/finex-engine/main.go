@@ -22,6 +22,10 @@ func CreateWorker(id string) engines.Worker {
 		return engines.NewOrderProcessorWorker()
 	case "trade_executor":
 		return engines.NewTradeExecutorWorker()
+	case "ieo_order_processor":
+		return engines.NewIEOOrderProcessorWorker()
+	case "ieo_order_executor":
+		return engines.NewIEOOrderExecutorWorker()
 	default:
 		return nil
 	}

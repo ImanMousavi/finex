@@ -95,3 +95,7 @@ func ValidateTakerType(val types.TakerType) bool {
 
 	return false
 }
+
+func ValidateMarketType(val string) bool {
+	return true
+}

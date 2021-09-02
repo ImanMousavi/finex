@@ -35,7 +35,6 @@ func NewOrderProcessorWorker() *OrderProcessorWorker {
 func (w OrderProcessorWorker) Process(payload []byte) error {
 	var order_processor_payload OrderProcessorPayloadMessage
 	err := json.Unmarshal(payload, &order_processor_payload)
-
 	if err != nil {
 		return err
 	}
