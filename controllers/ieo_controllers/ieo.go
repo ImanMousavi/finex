@@ -11,17 +11,8 @@ import (
 	"github.com/zsmartex/finex/controllers/helpers"
 	"github.com/zsmartex/finex/models"
 	"github.com/zsmartex/finex/models/datatypes"
-	"github.com/zsmartex/finex/types"
 	"gorm.io/gorm"
 )
-
-func GetIEOList(c *fiber.Ctx) error {
-	var lst_ieo []*models.IEO
-
-	config.DataBase.Find(&lst_ieo, "state = ?", types.MarketStateEndabled)
-
-	return c.Status(200).JSON(lst_ieo)
-}
 
 type CreateIEOOrderPayload struct {
 	IEOID         uint64          `json:"ieo_id" form:"ieo_id"`
@@ -40,10 +31,27 @@ func CreateIEOOrder(c *fiber.Ctx) error {
 	}
 
 	var ieo *models.IEO
-
 	if result := config.DataBase.First(&ieo, payload.IEOID); errors.Is(result.Error, gorm.ErrRecordNotFound) {
 		return c.Status(422).JSON(helpers.Errors{
 			Errors: []string{"record.not_found"},
+		})
+	}
+
+	if !ieo.IsEnabled() {
+		return c.Status(422).JSON(helpers.Errors{
+			Errors: []string{"market.ieo.not_enabled"},
+		})
+	}
+
+	if ieo.IsEnded() {
+		return c.Status(422).JSON(helpers.Errors{
+			Errors: []string{"market.ieo.is_ended"},
+		})
+	}
+
+	if !ieo.IsStarted() {
+		return c.Status(422).JSON(helpers.Errors{
+			Errors: []string{"market.ieo.not_started"},
 		})
 	}
 

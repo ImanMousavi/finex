@@ -485,7 +485,7 @@ func EstimateRequiredFunds() {
 
 }
 
-func (o *Order) ToJSON() entities.OrderEntities {
+func (o *Order) ToJSON() entities.OrderEntity {
 	var StateString string
 	var SideString string
 
@@ -509,7 +509,7 @@ func (o *Order) ToJSON() entities.OrderEntities {
 		SideString = "sell"
 	}
 
-	return entities.OrderEntities{
+	return entities.OrderEntity{
 		UUID:            o.UUID,
 		Market:          o.MarketID,
 		Side:            SideString,

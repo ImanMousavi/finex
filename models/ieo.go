@@ -27,6 +27,14 @@ func (m *IEO) IsEnabled() bool {
 	return m.State == "enabled"
 }
 
+func (m *IEO) IsEnded() bool {
+	return time.Now().After(m.EndTime)
+}
+
+func (m *IEO) IsStarted() bool {
+	return time.Now().After(m.StartTime)
+}
+
 func (m *IEO) GetPriceByParent(currency_id string) decimal.Decimal {
 	var price decimal.Decimal
 

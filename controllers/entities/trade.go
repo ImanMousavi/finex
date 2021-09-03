@@ -7,7 +7,7 @@ import (
 	"github.com/zsmartex/finex/types"
 )
 
-type TradeEntities struct {
+type TradeEntity struct {
 	ID          uint64          `json:"id"`
 	Market      string          `json:"market"`
 	Price       decimal.Decimal `json:"price"`

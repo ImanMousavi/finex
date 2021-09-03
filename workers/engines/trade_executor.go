@@ -299,14 +299,14 @@ func (t *TradeExecutor) Strike(trade *models.Trade, order *models.Order, outcome
 func (t *TradeExecutor) PublishTrade(trade *models.Trade) {
 	if !t.IsMakerOrderFake() {
 		maker := trade.Maker()
-		if payload_message, err := json.Marshal(trade.ToJSON(maker)); err == nil {
+		if payload_message, err := json.Marshal(trade.ForUser(maker)); err == nil {
 			mq_client.EnqueueEvent("private", maker.UID, "trade", payload_message)
 		}
 	}
 
 	if !t.IsTakerOrderFake() {
 		taker := trade.Taker()
-		if payload_message, err := json.Marshal(trade.ToJSON(taker)); err == nil {
+		if payload_message, err := json.Marshal(trade.ForUser(taker)); err == nil {
 			mq_client.EnqueueEvent("private", taker.UID, "trade", payload_message)
 		}
 	}

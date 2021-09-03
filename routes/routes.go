@@ -5,6 +5,7 @@ import (
 	"github.com/gofiber/fiber/v2/middleware/logger"
 
 	"github.com/zsmartex/finex/controllers"
+	"github.com/zsmartex/finex/controllers/admin_controllers"
 	"github.com/zsmartex/finex/controllers/market_controllers"
 	"github.com/zsmartex/finex/routes/middlewares"
 )
@@ -17,7 +18,17 @@ func SetupRouter() *fiber.App {
 	{
 		api_v2_public.Get("/timestamp", controllers.GetTimestamp)
 		api_v2_public.Get("/global_price", controllers.GetGlobalPrice)
+		api_v2_public.Get("/ieo/list", controllers.GetIEOList)
 		api_v2_public.Get("/markets/:market/depth", controllers.GetDepth)
+	}
+
+	api_v2_admin := app.Group("/api/v2/admin", middlewares.Authenticate, middlewares.AdminVaildator)
+	{
+		api_v2_admin.Get("/trades", admin_controllers.GetTrades)
+		api_v2_admin.Get("/ieo/list", admin_controllers.GetIEOList)
+		api_v2_admin.Post("/ieo", admin_controllers.CreateIEO)
+		api_v2_admin.Put("/ieo", admin_controllers.UpdateIEO)
+		api_v2_admin.Delete("/ieo", admin_controllers.DeleteIEO)
 	}
 
 	api_v2_market := app.Group("/api/v2/market", middlewares.Authenticate)

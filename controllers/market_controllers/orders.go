@@ -47,7 +47,7 @@ func GetOrders(c *fiber.Ctx) error {
 	CurrentUser := c.Locals("CurrentUser").(*models.Member)
 
 	var orders []*models.Order
-	orders_json := make([]entities.OrderEntities, 0)
+	orders_json := make([]entities.OrderEntity, 0)
 
 	params := new(queries.OrderFilters)
 	if err := c.QueryParser(params); err != nil {
@@ -230,7 +230,7 @@ func CancelAllOrders(c *fiber.Ctx) error {
 		config.Nats.Publish("matching", payload_matching_attrs)
 	}
 
-	var ordersJSON []entities.OrderEntities
+	var ordersJSON []entities.OrderEntity
 
 	for _, order := range orders {
 		ordersJSON = append(ordersJSON, order.ToJSON())

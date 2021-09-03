@@ -9,6 +9,7 @@ import (
 	"github.com/zsmartex/finex/config"
 	"github.com/zsmartex/finex/controllers/helpers"
 	"github.com/zsmartex/finex/controllers/queries"
+	"github.com/zsmartex/finex/models"
 	"github.com/zsmartex/finex/types"
 	"github.com/zsmartex/pkg"
 )
@@ -18,6 +19,14 @@ func GetTimestamp(c *fiber.Ctx) error {
 	c.Status(200).JSON(time.Now())
 
 	return nil
+}
+
+func GetIEOList(c *fiber.Ctx) error {
+	var lst_ieo []*models.IEO
+
+	config.DataBase.Find(&lst_ieo, "state = ?", types.MarketStateEndabled)
+
+	return c.Status(200).JSON(lst_ieo)
 }
 
 func GetDepth(c *fiber.Ctx) error {

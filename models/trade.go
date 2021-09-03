@@ -9,7 +9,8 @@ import (
 
 	"github.com/shopspring/decimal"
 	"github.com/zsmartex/finex/config"
-	"github.com/zsmartex/finex/controllers/entities"
+	api_admin_entities "github.com/zsmartex/finex/controllers/admin_controllers/entities"
+	api_entities "github.com/zsmartex/finex/controllers/entities"
 	"github.com/zsmartex/finex/types"
 	"github.com/zsmartex/pkg/order"
 	"gorm.io/gorm"
@@ -329,7 +330,7 @@ func GetLastTradeFromInflux(market string) *Trade {
 	return nil
 }
 
-func (t *Trade) ToJSON(member *Member) entities.TradeEntities {
+func (t *Trade) ForUser(member *Member) api_entities.TradeEntity {
 	var fee_currency string
 	var fee_amount decimal.Decimal
 	order := t.OrderForMember(member)
@@ -343,7 +344,7 @@ func (t *Trade) ToJSON(member *Member) entities.TradeEntities {
 		fee_amount = t.OrderFee(order).Mul(t.Total)
 	}
 
-	return entities.TradeEntities{
+	return api_entities.TradeEntity{
 		ID:          t.ID,
 		Market:      t.MarketID,
 		Price:       t.Price,
@@ -378,5 +379,72 @@ func (t *Trade) TradeGlobalJSON() TradeGlobalJSON {
 		Total:     t.Total,
 		TakerType: t.TakerType,
 		CreatedAt: t.CreatedAt.Unix(),
+	}
+}
+
+func (t *Trade) ToJSON() api_admin_entities.TradeEntity {
+	var maker_email string
+	var maker_uid string
+	var maker_fee = decimal.Zero
+	var maker_fee_amount = decimal.Zero
+	var maker_fee_currency string
+
+	if t.MakerOrderID > 0 {
+		maker := t.Maker()
+		maker_order := t.MakerOrder()
+
+		maker_email = maker.Email
+		maker_uid = maker.UID
+		maker_fee = maker_order.MakerFee
+		maker_fee_amount = t.OrderFee(maker_order)
+
+		if maker_order.Side() == types.TypeBuy {
+			maker_fee_currency = maker_order.Ask
+		} else {
+			maker_fee_currency = maker_order.Bid
+		}
+	}
+
+	var taker_email string
+	var taker_uid string
+	var taker_fee = decimal.Zero
+	var taker_fee_amount = decimal.Zero
+	var taker_fee_currency string
+
+	if t.MakerOrderID > 0 {
+		taker := t.Taker()
+		taker_order := t.TakerOrder()
+
+		taker_email = taker.Email
+		taker_uid = taker.UID
+		taker_fee = taker_order.MakerFee
+		taker_fee_amount = t.OrderFee(taker_order)
+
+		if taker_order.Side() == types.TypeBuy {
+			taker_fee_currency = taker_order.Ask
+		} else {
+			taker_fee_currency = taker_order.Bid
+		}
+	}
+
+	return api_admin_entities.TradeEntity{
+		ID:               t.ID,
+		Price:            t.Price,
+		Amount:           t.Amount,
+		Total:            t.Total,
+		Market:           t.MarketID,
+		TakerType:        t.TakerType,
+		MakerOrderEmail:  maker_email,
+		TakerOrderEmail:  taker_email,
+		MakerUID:         maker_uid,
+		TakerUID:         taker_uid,
+		MakerFee:         maker_fee,
+		MakerFeeAmount:   maker_fee_amount,
+		MakerFeeCurrency: maker_fee_currency,
+		TakerFee:         taker_fee,
+		TakerFeeAmount:   taker_fee_amount,
+		TakerFeeCurrency: taker_fee_currency,
+		CreatedAt:        t.CreatedAt,
+		UpdatedAt:        t.UpdatedAt,
 	}
 }

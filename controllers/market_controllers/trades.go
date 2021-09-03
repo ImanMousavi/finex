@@ -76,9 +76,9 @@ func GetTrades(c *fiber.Ctx) error {
 	tx = tx.Offset(params.Page*params.Limit - params.Limit).Limit(params.Limit)
 	tx.Find(&trades)
 
-	var trades_json []entities.TradeEntities
+	var trades_json []entities.TradeEntity
 	for _, trade := range trades {
-		trades_json = append(trades_json, trade.ToJSON(CurrentUser))
+		trades_json = append(trades_json, trade.ForUser(CurrentUser))
 	}
 
 	return c.Status(200).JSON(trades_json)

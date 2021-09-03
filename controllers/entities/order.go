@@ -8,7 +8,7 @@ import (
 	"github.com/zsmartex/finex/types"
 )
 
-type OrderEntities struct {
+type OrderEntity struct {
 	UUID            uuid.UUID           `json:"uuid"`
 	Market          string              `json:"market"`
 	Side            string              `json:"side"`

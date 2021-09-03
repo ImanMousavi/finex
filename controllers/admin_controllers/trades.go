@@ -1,11 +1,12 @@
 package admin_controllers
 
 import (
+	"strconv"
 	"time"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/zsmartex/finex/config"
-	"github.com/zsmartex/finex/controllers/entities"
+	"github.com/zsmartex/finex/controllers/admin_controllers/entities"
 	"github.com/zsmartex/finex/controllers/helpers"
 	"github.com/zsmartex/finex/controllers/queries"
 	"github.com/zsmartex/finex/models"
@@ -42,7 +43,7 @@ func GetTrades(c *fiber.Ctx) error {
 		params.OrderBy = types.OrderByDesc
 	}
 
-	tx := config.DataBase.Order("id " + params.OrderBy)
+	tx := config.DataBase.Order("id " + params.OrderBy).Where("maker_order_id != 0 AND taker_order_id != 0")
 
 	if len(params.Market) > 0 {
 		tx = tx.Where("market_id = ?", params.Market)
@@ -73,10 +74,14 @@ func GetTrades(c *fiber.Ctx) error {
 	tx = tx.Offset(params.Page*params.Limit - params.Limit).Limit(params.Limit)
 	tx.Find(&trades)
 
-	var trades_json []entities.TradeEntities
+	var trades_json []entities.TradeEntity
+
 	for _, trade := range trades {
-		trades_json = append(trades_json, trade.ToJSON(CurrentUser))
+		trades_json = append(trades_json, trade.ToJSON())
 	}
+
+	c.Response().Header.Add("page", strconv.FormatInt(int64(params.Page), 10))
+	c.Response().Header.Add("per-page", strconv.FormatInt(int64(len(trades)), 10))
 
 	return c.Status(200).JSON(trades_json)
 }
