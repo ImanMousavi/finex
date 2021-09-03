@@ -1,6 +1,7 @@
 package market_controllers
 
 import (
+	"strconv"
 	"time"
 
 	"github.com/gofiber/fiber/v2"
@@ -80,6 +81,9 @@ func GetTrades(c *fiber.Ctx) error {
 	for _, trade := range trades {
 		trades_json = append(trades_json, trade.ForUser(CurrentUser))
 	}
+
+	c.Response().Header.Add("page", strconv.FormatInt(int64(params.Page), 10))
+	c.Response().Header.Add("per-page", strconv.FormatInt(int64(len(trades)), 10))
 
 	return c.Status(200).JSON(trades_json)
 }

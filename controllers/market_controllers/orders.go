@@ -3,6 +3,7 @@ package market_controllers
 import (
 	"encoding/json"
 	"errors"
+	"strconv"
 	"time"
 
 	"github.com/gofiber/fiber/v2"
@@ -130,6 +131,9 @@ func GetOrders(c *fiber.Ctx) error {
 	for _, order := range orders {
 		orders_json = append(orders_json, order.ToJSON())
 	}
+
+	c.Response().Header.Add("page", strconv.FormatInt(int64(params.Page), 10))
+	c.Response().Header.Add("per-page", strconv.FormatInt(int64(len(orders)), 10))
 
 	return c.Status(200).JSON(orders_json)
 }

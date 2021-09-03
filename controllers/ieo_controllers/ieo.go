@@ -67,6 +67,12 @@ func CreateIEOOrder(c *fiber.Ctx) error {
 		})
 	}
 
+	if payload.Quantity.LessThan(ieo.MinAmount) {
+		return c.Status(422).JSON(helpers.Errors{
+			Errors: []string{"market.ieo.low_quantity"},
+		})
+	}
+
 	var payment_currency *datatypes.IEOPaymentCurrency
 
 	found_payment_currency := false
