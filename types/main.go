@@ -39,7 +39,7 @@ const (
 )
 
 type Config struct {
-	Referral *Referral `yaml:"rewards"`
+	Referral *Referral `yaml:"referral"`
 }
 
 type Referral struct {
