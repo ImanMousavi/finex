@@ -1,7 +1,6 @@
 package cron
 
 import (
-	"log"
 	"time"
 
 	"github.com/jasonlvhit/gocron"
@@ -15,7 +14,7 @@ type ReleaseCommissionJob struct {
 
 func (j *ReleaseCommissionJob) Process() {
 	s := gocron.NewScheduler()
-	s.Every(1).At("00:00:00").Do(releaseReferrals)
+	s.Every(1).Day().At("00:00:00").Do(releaseReferrals)
 	<-s.Start()
 }
 
@@ -40,8 +39,6 @@ func releaseReferrals() {
 		Where("CAST(\"created_at\" AS DATE) = ?", yesterday).
 		Group("member_id").
 		Find(&group_referrals)
-
-	log.Println(group_referrals)
 
 	for _, group_referral := range group_referrals {
 		var commissions []*models.Commission
