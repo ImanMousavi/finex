@@ -205,7 +205,7 @@ func SubmitOrder(id uint64) error {
 		}
 
 		account_tx := tx.Clauses(clause.Locking{Strength: "UPDATE", Table: clause.Table{Name: "accounts"}})
-		account_tx.Where("member_id = ? AND currency_id = ?", order.MemberID, order.Currency().ID).FirstOrCreate(account)
+		account_tx.Where("member_id = ? AND currency_id = ?", order.MemberID, order.Currency().ID).FirstOrCreate(&account)
 		if err := account.LockFunds(account_tx, order.Locked); err != nil {
 			return err
 		}
@@ -225,14 +225,14 @@ func SubmitOrder(id uint64) error {
 	})
 
 	if err != nil {
-		result := config.DataBase.Where("id = ?", id).First(order)
+		result := config.DataBase.Where("id = ?", id).First(&order)
 
 		if errors.Is(result.Error, gorm.ErrRecordNotFound) {
 			return err
 		}
 
 		order.State = StateReject
-		config.DataBase.Save(order)
+		config.DataBase.Save(&order)
 	}
 
 	return nil
@@ -254,7 +254,7 @@ func CancelOrder(id uint64) error {
 		}
 
 		account_tx := tx.Clauses(clause.Locking{Strength: "UPDATE", Table: clause.Table{Name: "accounts"}})
-		account_tx.Where("member_id = ? AND currency_id = ?", order.MemberID, order.Currency().ID).FirstOrCreate(account)
+		account_tx.Where("member_id = ? AND currency_id = ?", order.MemberID, order.Currency().ID).FirstOrCreate(&account)
 		if err := account.UnlockFunds(tx, order.Locked); err != nil {
 			return err
 		}

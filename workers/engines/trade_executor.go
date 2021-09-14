@@ -244,7 +244,7 @@ func (t *TradeExecutor) CreateTradeAndStrikeOrders() (*models.Trade, error) {
 		}
 		tx.Create(&trade)
 
-		if !t.IsMakerOrderFake() && !t.IsTakerOrderFake() {
+		if !t.IsMakerOrderFake() || !t.IsTakerOrderFake() {
 			if err := trade.RecordCompleteOperations(t.TradePayload.SellOrder(), t.TradePayload.BuyOrder(), tx); err != nil {
 				return err
 			}

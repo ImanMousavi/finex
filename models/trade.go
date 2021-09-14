@@ -2,7 +2,6 @@ package models
 
 import (
 	"encoding/json"
-	"log"
 	"sort"
 	"strings"
 	"time"
@@ -69,6 +68,9 @@ func (t *Trade) Taker() *Member {
 
 func (t *Trade) MakerOrder() *Order {
 	var order *Order
+	if t.MakerOrderID == 0 {
+		panic("lmao")
+	}
 	config.DataBase.First(&order, "id = ?", t.MakerOrderID)
 	return order
 }
@@ -80,10 +82,17 @@ func (t *Trade) TakerOrder() *Order {
 }
 
 func (t *Trade) SellerOrder() *Order {
-	maker_order := t.MakerOrder()
-	taker_order := t.TakerOrder()
+	maker_order := &Order{}
+	taker_order := &Order{}
 
-	if maker_order.Side() == types.TypeSell {
+	if t.MakerOrderID > 0 {
+		maker_order = t.MakerOrder()
+	}
+	if t.TakerOrderID > 0 {
+		taker_order = t.TakerOrder()
+	}
+
+	if maker_order.Side() == types.TypeSell && t.MakerOrderID > 0 {
 		return maker_order
 	} else {
 		return taker_order
@@ -91,10 +100,17 @@ func (t *Trade) SellerOrder() *Order {
 }
 
 func (t *Trade) BuyerOrder() *Order {
-	maker_order := t.MakerOrder()
-	taker_order := t.TakerOrder()
+	maker_order := &Order{}
+	taker_order := &Order{}
 
-	if maker_order.Side() == types.TypeBuy {
+	if t.MakerOrderID > 0 {
+		maker_order = t.MakerOrder()
+	}
+	if t.TakerOrderID > 0 {
+		taker_order = t.TakerOrder()
+	}
+
+	if maker_order.Side() == types.TypeBuy && t.MakerOrderID > 0 {
 		return maker_order
 	} else {
 		return taker_order
@@ -134,10 +150,14 @@ func (t *Trade) WriteToInflux() {
 func (t *Trade) RecordCompleteOperations(seller_matching_order, buyer_matching_order order.Order, tx *gorm.DB) error {
 	var seller_order *Order
 	var buyer_order *Order
-	if !seller_matching_order.IsFake() {
+
+	is_seller_fake := seller_matching_order.IsFake()
+	is_buyer_fake := buyer_matching_order.IsFake()
+
+	if !is_seller_fake {
 		seller_order = t.SellerOrder()
 	}
-	if !buyer_matching_order.IsFake() {
+	if !is_buyer_fake {
 		buyer_order = t.BuyerOrder()
 	}
 	reference := Reference{
@@ -145,16 +165,24 @@ func (t *Trade) RecordCompleteOperations(seller_matching_order, buyer_matching_o
 		Type: "Trade",
 	}
 
-	is_seller_fake := buyer_matching_order.IsFake()
-	is_buyer_fake := buyer_matching_order.IsFake()
-
 	t.RecordLiabilityDebit(seller_order, buyer_order, is_seller_fake, is_buyer_fake, reference)
 	t.RecordLiabilityCredit(seller_order, buyer_order, is_seller_fake, is_buyer_fake, reference)
 	t.RecordLiabilityTransfer(seller_order, buyer_order, is_seller_fake, is_buyer_fake, reference)
 
-	seller_fee, buyer_fee, err := t.RecordReferrals(
-		t.Total.Mul(t.OrderFee(seller_order)),
-		t.Amount.Mul(t.OrderFee(buyer_order)),
+	seller_fee := decimal.Zero
+	buyer_fee := decimal.Zero
+
+	if !is_seller_fake {
+		seller_fee = t.Total.Mul(t.OrderFee(seller_order))
+	}
+
+	if !is_buyer_fake {
+		buyer_fee = t.Amount.Mul(t.OrderFee(buyer_order))
+	}
+
+	s_fee, b_fee, err := t.RecordReferrals(
+		seller_fee,
+		buyer_fee,
 		seller_order,
 		buyer_order,
 		is_seller_fake,
@@ -166,6 +194,9 @@ func (t *Trade) RecordCompleteOperations(seller_matching_order, buyer_matching_o
 	if err != nil {
 		return err
 	}
+
+	seller_fee = s_fee
+	buyer_fee = b_fee
 
 	t.RecordRevenues(seller_fee, buyer_fee, seller_order, buyer_order, is_seller_fake, is_buyer_fake, reference, tx)
 
@@ -259,7 +290,7 @@ func (t *Trade) RecordReferrals(seller_fee, buyer_fee decimal.Decimal, seller_or
 		return config.Referral.Rewards[i].HoldAmount.GreaterThan(config.Referral.Rewards[j].HoldAmount)
 	})
 	var refCurrency *Currency
-	config.DataBase.First(&refCurrency, "id = ?", strings.ToLower(config.Referral.CurrencyID))
+	config.DataBase.First(&refCurrency, "id = ?", strings.ToLower(config.Referral.Currency))
 
 	for _, reward := range config.Referral.Rewards {
 		if !is_seller_fake && seller_fee.IsPositive() {
@@ -272,7 +303,7 @@ func (t *Trade) RecordReferrals(seller_fee, buyer_fee decimal.Decimal, seller_or
 			refHoldAccount := refMember.GetAccount(refCurrency)
 
 			if refHoldAccount.Balance.GreaterThanOrEqual(reward.HoldAmount) {
-				reward_amount := seller_fee.Mul(reward.Reward)
+				reward_amount := seller_fee.Mul(reward.Reward).Round(8)
 				if err := refMember.GetAccount(seller_order.IncomeCurrency()).PlusFunds(tx, reward_amount); err != nil {
 					return seller_fee, buyer_fee, err
 				}
@@ -308,7 +339,7 @@ func (t *Trade) RecordReferrals(seller_fee, buyer_fee decimal.Decimal, seller_or
 			refHoldAccount := refMember.GetAccount(refCurrency)
 
 			if refHoldAccount.Balance.GreaterThanOrEqual(reward.HoldAmount) {
-				reward_amount := buyer_fee.Mul(reward.Reward)
+				reward_amount := buyer_fee.Mul(reward.Reward).Round(8)
 				if err := refMember.GetAccount(buyer_order.IncomeCurrency()).PlusFunds(tx, reward_amount); err != nil {
 					return seller_fee, buyer_fee, err
 				}
@@ -368,8 +399,6 @@ func GetLastTradeFromInflux(market string) *Trade {
 	var trades []map[string]interface{}
 	config.InfluxDB.Query("SELECT LAST(*) FROM \"trades\" WHERE \"market\"='"+market+"'", &trades)
 	if len(trades) > 0 {
-		log.Println(trades[0]["last_price"])
-
 		id, _ := trades[0]["last_id"].(json.Number).Int64()
 		last_price, _ := trades[0]["last_price"].(json.Number).Float64()
 		last_amount, _ := trades[0]["last_amount"].(json.Number).Float64()

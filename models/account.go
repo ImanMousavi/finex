@@ -33,7 +33,7 @@ func (a Account) ValidateLocked(Locked decimal.Decimal) bool {
 func (a *Account) Currency() *Currency {
 	var currency *Currency
 
-	config.DataBase.First(currency, "id = ?", a.CurrencyID)
+	config.DataBase.First(&currency, "id = ?", a.CurrencyID)
 
 	return currency
 }
@@ -41,7 +41,7 @@ func (a *Account) Currency() *Currency {
 func (a *Account) Member() *Member {
 	var member *Member
 
-	config.DataBase.First(member, "id = ?", a.MemberID)
+	config.DataBase.First(&member, "id = ?", a.MemberID)
 
 	return member
 }

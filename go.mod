@@ -6,6 +6,7 @@ require (
 	github.com/cbrake/influxdbhelper/v2 v2.1.4
 	github.com/dgrijalva/jwt-go v3.2.0+incompatible
 	github.com/emirpasic/gods v1.12.0
+	github.com/friendsofgo/errors v0.9.2 // indirect
 	github.com/go-redis/redis/v8 v8.10.0
 	github.com/gofiber/fiber/v2 v2.10.0
 	github.com/gofrs/uuid v4.0.0+incompatible // indirect
@@ -21,6 +22,9 @@ require (
 	github.com/shopspring/decimal v1.2.0
 	github.com/sirupsen/logrus v1.4.2
 	github.com/streadway/amqp v1.0.0
+	github.com/volatiletech/inflect v0.0.1 // indirect
+	github.com/volatiletech/null v8.0.0+incompatible
+	github.com/volatiletech/sqlboiler v3.7.1+incompatible // indirect
 	github.com/zsmartex/pkg v1.1.6
 	golang.org/x/net v0.0.0-20210405180319-a5a99cb37ef4 // indirect
 	golang.org/x/sys v0.0.0-20210525143221-35b2ab0089ea // indirect

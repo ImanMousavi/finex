@@ -7,6 +7,8 @@ import (
 	"strings"
 
 	"github.com/dgrijalva/jwt-go"
+	"github.com/volatiletech/null"
+
 	"github.com/gofiber/fiber/v2"
 	"github.com/zsmartex/finex/config"
 	"github.com/zsmartex/finex/models"
@@ -37,14 +39,14 @@ var (
 //   "referral_uid": null
 // }
 type Auth struct {
-	UID         string         `json:"uid"`
-	State       string         `json:"state"`
-	Email       string         `json:"email"`
-	Username    sql.NullString `json:"username"`
-	Role        string         `json:"role"`
-	ReferralUID sql.NullString `json:"referral_uid"`
-	Level       int32          `json:"level"`
-	Audience    []string       `json:"aud,omitempty"`
+	UID         string      `json:"uid"`
+	State       string      `json:"state"`
+	Email       string      `json:"email"`
+	Username    null.String `json:"username"`
+	Role        string      `json:"role"`
+	ReferralUID null.String `json:"referral_uid"`
+	Level       int32       `json:"level"`
+	Audience    []string    `json:"aud,omitempty"`
 
 	jwt.StandardClaims
 }
@@ -93,11 +95,14 @@ func Authenticate(c *fiber.Ctx) error {
 
 	config.DataBase.Where("uid = ?", auth.UID).Assign(
 		&models.Member{
-			Email:       auth.Email,
-			Role:        auth.Role,
-			State:       auth.State,
-			Level:       auth.Level,
-			ReferralUID: auth.ReferralUID,
+			Email: auth.Email,
+			Role:  auth.Role,
+			State: auth.State,
+			Level: auth.Level,
+			ReferralUID: sql.NullString{
+				Valid:  auth.ReferralUID.Valid,
+				String: auth.ReferralUID.String,
+			},
 		},
 	).FirstOrCreate(&member)
 	config.DataBase.Where("uid = ?", auth.UID).Updates(&models.Member{

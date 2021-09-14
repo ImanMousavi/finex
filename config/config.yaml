@@ -1,5 +1,5 @@
 referral:
-  enable: false
+  enabled: false
   currency: MYTK
   rewards:
     - hold_amount: 1000

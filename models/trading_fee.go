@@ -36,10 +36,10 @@ func TradingFeeFor(group, market_type, market_id string) *TradingFee {
 		[]string{group, "any"},
 	).Find(&trading_fees)
 
-	trading_fee := &TradingFee{}
+	var trading_fee *TradingFee = nil
 
 	for _, tf := range trading_fees {
-		if trading_fee.Weight() < tf.Weight() {
+		if trading_fee == nil || trading_fee.Weight() < tf.Weight() {
 			trading_fee = tf
 		}
 	}

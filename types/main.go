@@ -43,9 +43,9 @@ type Config struct {
 }
 
 type Referral struct {
-	Enabled    bool                   `yaml:"enabled"`
-	CurrencyID string                 `yaml:"currency_id"`
-	Rewards    []ConfigReferralReward `yaml:"rewards"`
+	Enabled  bool                   `yaml:"enabled"`
+	Currency string                 `yaml:"currency"`
+	Rewards  []ConfigReferralReward `yaml:"rewards"`
 }
 
 type ConfigReferralReward struct {
