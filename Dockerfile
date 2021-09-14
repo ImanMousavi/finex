@@ -14,7 +14,7 @@ RUN go build -o finex-engine ./cmd/finex-engine/main.go
 RUN go build -o finex-daemon ./cmd/finex-daemon/main.go
 
 
-FROM alpine:3.12.7
+FROM alpine:3.13.6
 
 RUN apk add ca-certificates
 WORKDIR /app
