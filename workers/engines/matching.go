@@ -64,6 +64,10 @@ func (w MatchingWorker) SubmitOrder(order *order.Order) error {
 		return errors.New("engine is not ready")
 	}
 
+	if order.Price.IsNegative() || order.StopPrice.IsNegative() {
+		return errors.New("price is negative")
+	}
+
 	engine.Submit(order)
 	return nil
 }
