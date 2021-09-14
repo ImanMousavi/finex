@@ -1,8 +1,6 @@
 package queries
 
 import (
-	"time"
-
 	"github.com/shopspring/decimal"
 	"github.com/zsmartex/finex/models/datatypes"
 	"github.com/zsmartex/finex/types"
@@ -16,6 +14,6 @@ type IEOPayload struct {
 	PaymentCurrencies   datatypes.IEOPaymentCurrencies `json:"payment_currencies"`
 	MinAmount           decimal.Decimal                `json:"min_amount"`
 	State               types.MarketState              `json:"state"`
-	StartTime           time.Time                      `json:"start_time"`
-	EndTime             time.Time                      `json:"end_time"`
+	StartTime           int64                          `json:"start_time"`
+	EndTime             int64                          `json:"end_time"`
 }

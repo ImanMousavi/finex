@@ -29,7 +29,6 @@ func GetTrades(c *fiber.Ctx) error {
 	}
 
 	helpers.Vaildate(params, errors)
-
 	if errors.Size() > 0 {
 		return c.Status(422).JSON(errors)
 	}

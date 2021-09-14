@@ -1,6 +1,8 @@
 package admin_controllers
 
 import (
+	"time"
+
 	"github.com/gofiber/fiber/v2"
 	"github.com/zsmartex/finex/config"
 	"github.com/zsmartex/finex/controllers/admin_controllers/queries"
@@ -35,7 +37,7 @@ func ValidateIEOPayload(payload *queries.IEOPayload) *helpers.Errors {
 		e.Errors = append(e.Errors, "Unknow State")
 	}
 
-	if payload.EndTime.Before(payload.StartTime) || payload.EndTime.Equal(payload.StartTime) {
+	if payload.EndTime <= payload.StartTime {
 		e.Errors = append(e.Errors, "Start time must be before End time")
 	}
 
@@ -74,8 +76,8 @@ func CreateIEO(c *fiber.Ctx) error {
 		PaymentCurrencies:   payload.PaymentCurrencies,
 		MinAmount:           payload.MinAmount,
 		State:               payload.State,
-		StartTime:           payload.StartTime,
-		EndTime:             payload.EndTime,
+		StartTime:           time.Unix(payload.StartTime, 0),
+		EndTime:             time.Unix(payload.EndTime, 0),
 	}
 
 	config.DataBase.Create(&ieo)
@@ -107,8 +109,8 @@ func UpdateIEO(c *fiber.Ctx) error {
 	ieo.PaymentCurrencies = payload.PaymentCurrencies
 	ieo.MinAmount = payload.MinAmount
 	ieo.State = payload.State
-	ieo.StartTime = payload.StartTime
-	ieo.EndTime = payload.EndTime
+	ieo.StartTime = time.Unix(payload.StartTime, 0)
+	ieo.EndTime = time.Unix(payload.EndTime, 0)
 
 	config.DataBase.Save(&ieo)
 

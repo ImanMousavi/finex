@@ -13,7 +13,7 @@ type CronJob struct {
 }
 
 func NewCronJob() *CronJob {
-	jobs := []jobs.Job{&cron.GlobalPriceJob{}}
+	jobs := []jobs.Job{&cron.GlobalPriceJob{}, &cron.ReleaseCommissionJob{}}
 
 	return &CronJob{Running: true, Jobs: jobs}
 }

@@ -131,7 +131,7 @@ func (t *Trade) WriteToInflux() {
 	config.InfluxDB.NewPoint("trades", tags, fields)
 }
 
-func (t *Trade) RecordCompleteOperations(seller_matching_order, buyer_matching_order order.Order, tx *gorm.DB) {
+func (t *Trade) RecordCompleteOperations(seller_matching_order, buyer_matching_order order.Order, tx *gorm.DB) error {
 	var seller_order *Order
 	var buyer_order *Order
 	if !seller_matching_order.IsFake() {
@@ -145,17 +145,38 @@ func (t *Trade) RecordCompleteOperations(seller_matching_order, buyer_matching_o
 		Type: "Trade",
 	}
 
-	t.RecordLiabilityDebit(seller_order, buyer_order, seller_matching_order, buyer_matching_order, reference)
-	t.RecordLiabilityCredit(seller_order, buyer_order, seller_matching_order, buyer_matching_order, reference)
-	t.RecordLiabilityTransfer(seller_order, buyer_order, seller_matching_order, buyer_matching_order, reference)
-	t.RecordRevenues(seller_order, buyer_order, seller_matching_order, buyer_matching_order, reference, tx)
+	is_seller_fake := buyer_matching_order.IsFake()
+	is_buyer_fake := buyer_matching_order.IsFake()
+
+	t.RecordLiabilityDebit(seller_order, buyer_order, is_seller_fake, is_buyer_fake, reference)
+	t.RecordLiabilityCredit(seller_order, buyer_order, is_seller_fake, is_buyer_fake, reference)
+	t.RecordLiabilityTransfer(seller_order, buyer_order, is_seller_fake, is_buyer_fake, reference)
+
+	seller_fee, buyer_fee, err := t.RecordReferrals(
+		t.Total.Mul(t.OrderFee(seller_order)),
+		t.Amount.Mul(t.OrderFee(buyer_order)),
+		seller_order,
+		buyer_order,
+		is_seller_fake,
+		is_buyer_fake,
+		reference,
+		tx,
+	)
+
+	if err != nil {
+		return err
+	}
+
+	t.RecordRevenues(seller_fee, buyer_fee, seller_order, buyer_order, is_seller_fake, is_buyer_fake, reference, tx)
+
+	return nil
 }
 
-func (t *Trade) RecordLiabilityDebit(seller_order, buyer_order *Order, seller_matching_order, buyer_matching_order order.Order, reference Reference) {
+func (t *Trade) RecordLiabilityDebit(seller_order, buyer_order *Order, is_seller_fake, is_buyer_fake bool, reference Reference) {
 	seller_outcome := t.Amount
 	buyer_outcome := t.Total
 
-	if !seller_matching_order.IsFake() {
+	if !is_seller_fake {
 		LiabilityDebit(
 			seller_outcome,
 			seller_order.OutcomeCurrency(),
@@ -165,7 +186,7 @@ func (t *Trade) RecordLiabilityDebit(seller_order, buyer_order *Order, seller_ma
 		)
 	}
 
-	if !buyer_matching_order.IsFake() {
+	if !is_buyer_fake {
 		LiabilityDebit(
 			buyer_outcome,
 			buyer_order.OutcomeCurrency(),
@@ -176,19 +197,8 @@ func (t *Trade) RecordLiabilityDebit(seller_order, buyer_order *Order, seller_ma
 	}
 }
 
-func (t *Trade) RecordLiabilityCredit(seller_order, buyer_order *Order, seller_matching_order, buyer_matching_order order.Order, reference Reference) {
-	if !buyer_matching_order.IsFake() {
-		buyer_income := t.Amount.Sub(t.Amount.Mul(t.OrderFee(t.BuyerOrder())))
-		LiabilityDebit(
-			buyer_income,
-			buyer_order.IncomeCurrency(),
-			reference,
-			"main",
-			buyer_order.MemberID,
-		)
-	}
-
-	if !seller_matching_order.IsFake() {
+func (t *Trade) RecordLiabilityCredit(seller_order, buyer_order *Order, is_seller_fake, is_buyer_fake bool, reference Reference) {
+	if !is_seller_fake {
 		seller_income := t.Total.Sub(t.Total.Mul(t.OrderFee(t.SellerOrder())))
 		LiabilityDebit(
 			seller_income,
@@ -198,11 +208,22 @@ func (t *Trade) RecordLiabilityCredit(seller_order, buyer_order *Order, seller_m
 			seller_order.MemberID,
 		)
 	}
+
+	if !is_buyer_fake {
+		buyer_income := t.Amount.Sub(t.Amount.Mul(t.OrderFee(t.BuyerOrder())))
+		LiabilityDebit(
+			buyer_income,
+			buyer_order.IncomeCurrency(),
+			reference,
+			"main",
+			buyer_order.MemberID,
+		)
+	}
 }
 
 // TODO: Fix it
-func (t *Trade) RecordLiabilityTransfer(seller_order, buyer_order *Order, seller_matching_order, buyer_matching_order order.Order, reference Reference) {
-	if !seller_matching_order.IsFake() {
+func (t *Trade) RecordLiabilityTransfer(seller_order, buyer_order *Order, is_seller_fake, is_buyer_fake bool, reference Reference) {
+	if !is_seller_fake {
 		if seller_order.Volume.IsZero() || !seller_order.Locked.IsZero() {
 			LiabilityTranfer(
 				seller_order.Locked,
@@ -215,7 +236,7 @@ func (t *Trade) RecordLiabilityTransfer(seller_order, buyer_order *Order, seller
 		}
 	}
 
-	if !buyer_matching_order.IsFake() {
+	if !is_buyer_fake {
 		if buyer_order.Volume.IsZero() || !buyer_order.Locked.IsZero() {
 			LiabilityTranfer(
 				buyer_order.Locked,
@@ -229,57 +250,94 @@ func (t *Trade) RecordLiabilityTransfer(seller_order, buyer_order *Order, seller
 	}
 }
 
-func (t *Trade) RecordRevenues(seller_order, buyer_order *Order, seller_matching_order, buyer_matching_order order.Order, reference Reference, tx *gorm.DB) {
-	seller_fee := t.Total.Mul(t.OrderFee(seller_order))
-	buyer_fee := t.Amount.Mul(t.OrderFee(buyer_order))
+func (t *Trade) RecordReferrals(seller_fee, buyer_fee decimal.Decimal, seller_order, buyer_order *Order, is_seller_fake, is_buyer_fake bool, reference Reference, tx *gorm.DB) (decimal.Decimal, decimal.Decimal, error) {
+	if !config.Referral.Enabled {
+		return seller_fee, buyer_fee, nil
+	}
 
-	if config.Referral.Enabled {
-		sort.Slice(config.Referral.Rewards, func(i, j int) bool {
-			return config.Referral.Rewards[i].HoldAmount.GreaterThan(config.Referral.Rewards[j].HoldAmount)
-		})
-		var refCurrency *Currency
-		config.DataBase.First(&refCurrency, "id = ?", strings.ToLower(config.Referral.CurrencyID))
+	sort.Slice(config.Referral.Rewards, func(i, j int) bool {
+		return config.Referral.Rewards[i].HoldAmount.GreaterThan(config.Referral.Rewards[j].HoldAmount)
+	})
+	var refCurrency *Currency
+	config.DataBase.First(&refCurrency, "id = ?", strings.ToLower(config.Referral.CurrencyID))
 
-		for _, reward := range config.Referral.Rewards {
-			if !seller_matching_order.IsFake() && seller_fee.IsPositive() {
-				member := seller_order.Member()
-				if !member.HavingReferraller() {
-					break
-				}
-
-				refMember := member.GetRefMember()
-				refHoldAccount := refMember.GetAccount(refCurrency)
-
-				if refHoldAccount.Balance.GreaterThanOrEqual(reward.HoldAmount) {
-					reward_amount := seller_fee.Mul(reward.Reward)
-					refMember.GetAccount(seller_order.IncomeCurrency()).PlusFunds(tx, reward_amount)
-					seller_fee = seller_fee.Sub(reward_amount)
-					break
-				}
+	for _, reward := range config.Referral.Rewards {
+		if !is_seller_fake && seller_fee.IsPositive() {
+			member := seller_order.Member()
+			if !member.HavingReferraller() {
+				break
 			}
-		}
 
-		for _, reward := range config.Referral.Rewards {
-			if !buyer_matching_order.IsFake() && buyer_fee.IsPositive() {
-				member := buyer_order.Member()
-				if member.HavingReferraller() {
-					break
+			refMember := member.GetRefMember()
+			refHoldAccount := refMember.GetAccount(refCurrency)
+
+			if refHoldAccount.Balance.GreaterThanOrEqual(reward.HoldAmount) {
+				reward_amount := seller_fee.Mul(reward.Reward)
+				if err := refMember.GetAccount(seller_order.IncomeCurrency()).PlusFunds(tx, reward_amount); err != nil {
+					return seller_fee, buyer_fee, err
+				}
+				seller_fee = seller_fee.Sub(reward_amount)
+
+				if result := tx.Create(
+					&Commission{
+						AccountType:     "spot",
+						MemberID:        refMember.ID,
+						FriendUID:       member.UID,
+						EarnAmount:      reward_amount,
+						CurrencyID:      seller_order.IncomeCurrency().ID,
+						ParentID:        t.ID,
+						ParentCreatedAt: t.CreatedAt,
+					},
+				); result.Error != nil {
+					return seller_fee, buyer_fee, result.Error
 				}
 
-				refMember := member.GetRefMember()
-				refHoldAccount := refMember.GetAccount(refCurrency)
-
-				if refHoldAccount.Balance.GreaterThanOrEqual(reward.HoldAmount) {
-					reward_amount := buyer_fee.Mul(reward.Reward)
-					refMember.GetAccount(seller_order.IncomeCurrency()).PlusFunds(tx, reward_amount)
-					buyer_fee = buyer_fee.Sub(reward_amount)
-					break
-				}
+				break
 			}
 		}
 	}
 
-	if !seller_matching_order.IsFake() && seller_fee.IsPositive() {
+	for _, reward := range config.Referral.Rewards {
+		if !is_buyer_fake && buyer_fee.IsPositive() {
+			member := buyer_order.Member()
+			if member.HavingReferraller() {
+				break
+			}
+
+			refMember := member.GetRefMember()
+			refHoldAccount := refMember.GetAccount(refCurrency)
+
+			if refHoldAccount.Balance.GreaterThanOrEqual(reward.HoldAmount) {
+				reward_amount := buyer_fee.Mul(reward.Reward)
+				if err := refMember.GetAccount(buyer_order.IncomeCurrency()).PlusFunds(tx, reward_amount); err != nil {
+					return seller_fee, buyer_fee, err
+				}
+				buyer_fee = buyer_fee.Sub(reward_amount)
+
+				if result := tx.Create(
+					&Commission{
+						AccountType:     "spot",
+						MemberID:        refMember.ID,
+						FriendUID:       member.UID,
+						EarnAmount:      reward_amount,
+						CurrencyID:      buyer_order.IncomeCurrency().ID,
+						ParentID:        t.ID,
+						ParentCreatedAt: t.CreatedAt,
+					},
+				); result.Error != nil {
+					return seller_fee, buyer_fee, result.Error
+				}
+
+				break
+			}
+		}
+	}
+
+	return seller_fee, buyer_fee, nil
+}
+
+func (t *Trade) RecordRevenues(seller_fee, buyer_fee decimal.Decimal, seller_order, buyer_order *Order, is_seller_fake, is_buyer_fake bool, reference Reference, tx *gorm.DB) {
+	if !is_seller_fake && seller_fee.IsPositive() {
 		RevenueCredit(
 			seller_fee,
 			seller_order.IncomeCurrency(),
@@ -288,7 +346,7 @@ func (t *Trade) RecordRevenues(seller_order, buyer_order *Order, seller_matching
 		)
 	}
 
-	if !buyer_matching_order.IsFake() && buyer_fee.IsPositive() {
+	if !is_buyer_fake && buyer_fee.IsPositive() {
 		RevenueCredit(
 			buyer_fee,
 			buyer_order.IncomeCurrency(),
