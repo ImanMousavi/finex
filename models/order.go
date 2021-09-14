@@ -191,8 +191,8 @@ func GetDepth(side OrderSide, market string) [][]decimal.Decimal {
 }
 
 func SubmitOrder(id uint64) error {
-	account := &Account{}
-	order := &Order{}
+	var account *Account
+	var order *Order
 
 	err := config.DataBase.Transaction(func(tx *gorm.DB) error {
 		result := tx.Clauses(clause.Locking{Strength: "UPDATE", Table: clause.Table{Name: "orders"}}).Where("id = ?", id).First(&order)
@@ -239,8 +239,8 @@ func SubmitOrder(id uint64) error {
 }
 
 func CancelOrder(id uint64) error {
-	account := &Account{}
-	order := &Order{}
+	var account *Account
+	var order *Order
 
 	err := config.DataBase.Transaction(func(tx *gorm.DB) error {
 		result := tx.Clauses(clause.Locking{Strength: "UPDATE", Table: clause.Table{Name: "orders"}}).Where("id = ?", id).First(&order)

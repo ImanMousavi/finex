@@ -34,17 +34,17 @@ var (
 //   "role": "admin",
 //   "level": 3,
 //   "state": "active",
-//   "referral_id": null
+//   "referral_uid": null
 // }
 type Auth struct {
-	UID        string         `json:"uid"`
-	State      string         `json:"state"`
-	Email      string         `json:"email"`
-	Username   sql.NullString `json:"username"`
-	Role       string         `json:"role"`
-	ReferralID string         `json:"referral_id"`
-	Level      int32          `json:"level"`
-	Audience   []string       `json:"aud,omitempty"`
+	UID         string         `json:"uid"`
+	State       string         `json:"state"`
+	Email       string         `json:"email"`
+	Username    sql.NullString `json:"username"`
+	Role        string         `json:"role"`
+	ReferralUID sql.NullString `json:"referral_uid"`
+	Level       int32          `json:"level"`
+	Audience    []string       `json:"aud,omitempty"`
 
 	jwt.StandardClaims
 }
@@ -53,7 +53,7 @@ func Authenticate(c *fiber.Ctx) error {
 	var err error
 	var auth Auth
 
-	member := &models.Member{}
+	var member *models.Member
 
 	token := c.Get("Authorization")
 
@@ -93,12 +93,18 @@ func Authenticate(c *fiber.Ctx) error {
 
 	config.DataBase.Where("uid = ?", auth.UID).Assign(
 		&models.Member{
-			Email: auth.Email,
-			Role:  auth.Role,
-			State: auth.State,
-			Level: auth.Level,
+			Email:       auth.Email,
+			Role:        auth.Role,
+			State:       auth.State,
+			Level:       auth.Level,
+			ReferralUID: auth.ReferralUID,
 		},
-	).FirstOrCreate(member)
+	).FirstOrCreate(&member)
+	config.DataBase.Where("uid = ?", auth.UID).Updates(&models.Member{
+		Role:  auth.Role,
+		State: auth.State,
+		Level: auth.Level,
+	})
 
 	c.Locals("CurrentUser", member)
 

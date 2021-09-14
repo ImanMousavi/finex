@@ -52,7 +52,7 @@ func (t *Trade) Market() *Market {
 }
 
 func (t *Trade) Maker() *Member {
-	member := &Member{}
+	var member *Member
 
 	config.DataBase.First(&member, "id = ?", t.MakerID)
 
@@ -60,7 +60,7 @@ func (t *Trade) Maker() *Member {
 }
 
 func (t *Trade) Taker() *Member {
-	member := &Member{}
+	var member *Member
 
 	config.DataBase.First(&member, "id = ?", t.TakerID)
 
@@ -68,13 +68,13 @@ func (t *Trade) Taker() *Member {
 }
 
 func (t *Trade) MakerOrder() *Order {
-	order := &Order{}
+	var order *Order
 	config.DataBase.First(&order, "id = ?", t.MakerOrderID)
 	return order
 }
 
 func (t *Trade) TakerOrder() *Order {
-	order := &Order{}
+	var order *Order
 	config.DataBase.First(&order, "id = ?", t.TakerOrderID)
 	return order
 }

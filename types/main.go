@@ -59,3 +59,11 @@ var (
 	MarketStateEndabled MarketState = "endabled"
 	MarketStateDisabled MarketState = "disabled"
 )
+
+type AccountType string
+
+var (
+	SpotAcccountType   AccountType = "spot"
+	P2PAcccountType    AccountType = "p2p"
+	MarginAcccountType AccountType = "margin"
+)

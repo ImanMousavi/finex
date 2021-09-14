@@ -7,6 +7,7 @@ import (
 	"github.com/zsmartex/finex/controllers"
 	"github.com/zsmartex/finex/controllers/admin_controllers"
 	"github.com/zsmartex/finex/controllers/market_controllers"
+	"github.com/zsmartex/finex/controllers/referral_controllers"
 	"github.com/zsmartex/finex/routes/middlewares"
 )
 
@@ -39,6 +40,12 @@ func SetupRouter() *fiber.App {
 		api_v2_market.Post("/orders/:uuid/cancel", market_controllers.CancelOrderByUUID)
 		api_v2_market.Post("/orders/cancel", market_controllers.CancelAllOrders)
 		api_v2_market.Get("/trades", market_controllers.GetTrades)
+	}
+
+	api_v2_referral := app.Group("/api/v2/referral", middlewares.Authenticate)
+	{
+		api_v2_referral.Get("/", referral_controllers.GetReleaseCommission)
+		api_v2_referral.Get("/commissions", referral_controllers.GetCommissions)
 	}
 
 	return app
