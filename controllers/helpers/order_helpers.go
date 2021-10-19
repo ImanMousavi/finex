@@ -112,7 +112,7 @@ func (p CreateOrderParams) BuildOrder(member *models.Member, err_src *Errors) *m
 		payload, _ := json.Marshal(matching.CalculateMarketOrder{
 			Side:     side,
 			Quantity: p.Quantity,
-			Volume:   p.Volume,
+			// Volume:   p.Volume,
 		})
 
 		msg, err := config.Nats.Request("finex:calc_market_order:"+market.Symbol, payload, 5*time.Second)
