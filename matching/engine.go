@@ -7,7 +7,6 @@ import (
 	"github.com/nats-io/nats.go"
 	"github.com/shopspring/decimal"
 	"github.com/zsmartex/finex/config"
-	"github.com/zsmartex/pkg"
 	"github.com/zsmartex/pkg/order"
 )
 
@@ -54,18 +53,4 @@ func (e *Engine) CancelWithKey(key *order.OrderKey) {
 
 func (e *Engine) Cancel(o *order.Order) {
 	e.CancelWithKey(o.Key())
-	e.PublishCancel(o)
-}
-
-func (e *Engine) PublishCancel(o *order.Order) error {
-	order_processor_message, err := json.Marshal(map[string]interface{}{
-		"action": pkg.ActionCancel,
-		"order":  o,
-	})
-
-	if err != nil {
-		return err
-	}
-
-	return config.Nats.Publish("order_processor", order_processor_message)
 }

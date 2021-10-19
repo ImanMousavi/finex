@@ -7,6 +7,7 @@ import (
 	"github.com/shopspring/decimal"
 	"github.com/zsmartex/finex/config"
 	"github.com/zsmartex/finex/models"
+	"github.com/zsmartex/finex/types"
 )
 
 type ReleaseCommissionJob struct {
@@ -31,6 +32,7 @@ type GroupUserReferral struct {
 func releaseReferrals() {
 	var group_referrals []*GroupReferral
 
+	today := time.Now().Format("2006-01-02")
 	yesterday := time.Now().AddDate(0, 0, -1).Format("2006-01-02")
 
 	config.DataBase.
@@ -60,7 +62,7 @@ func releaseReferrals() {
 		earned_btc := earned_usdt.DivRound(btc_currency.Price, 8)
 
 		release_commission := &models.ReleaseCommission{
-			AccountType: "spot",
+			AccountType: types.SpotAcccountType,
 			MemberID:    group_referral.MemberID,
 			EarnedBTC:   earned_btc,
 			FriendTrade: group_referral.FriendTrade,
@@ -84,11 +86,11 @@ func releaseReferrals() {
 		var release_referral *models.ReleaseCommission
 
 		config.DataBase.Where("uid = ?", group_user_referral.UID).Find(&member)
-		if result := config.DataBase.Where("member_id = ? AND CAST(\"created_at\" AS DATE) = ?", member.ID, yesterday).First(&release_referral); result.Error == nil {
+		if result := config.DataBase.Where("member_id = ? AND CAST(\"created_at\" AS DATE) = ?", member.ID, today).First(&release_referral); result.Error == nil {
 			config.DataBase.Model(&release_referral).Update("friend", group_user_referral.Friend)
 		} else {
 			release_commission := &models.ReleaseCommission{
-				AccountType: "spot",
+				AccountType: types.SpotAcccountType,
 				MemberID:    member.ID,
 				EarnedBTC:   decimal.Zero,
 				FriendTrade: 0,

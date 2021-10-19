@@ -5,8 +5,10 @@ import (
 	"sync"
 
 	"github.com/emirpasic/gods/trees/redblacktree"
+	"github.com/nats-io/nats.go"
 	"github.com/shopspring/decimal"
 	"github.com/zsmartex/finex/config"
+	"github.com/zsmartex/pkg"
 	"github.com/zsmartex/pkg/order"
 	"github.com/zsmartex/pkg/trade"
 )
@@ -66,7 +68,7 @@ func StopComparator(a, b interface{}) (result int) {
 }
 
 func NewOrderBook(symbol string, market_price decimal.Decimal) *OrderBook {
-	return &OrderBook{
+	ob := &OrderBook{
 		Symbol:             symbol,
 		MarketPrice:        market_price,
 		Depth:              NewDepth(symbol),
@@ -74,6 +76,108 @@ func NewOrderBook(symbol string, market_price decimal.Decimal) *OrderBook {
 		StopAsks:           redblacktree.NewWith(StopComparator),
 		pendingOrdersQueue: NewOrderQueue(pendingOrdersCap),
 	}
+
+	ob.SubscribeCalcMarketOrder()
+
+	return ob
+}
+
+type CalculateMarketOrder struct {
+	Side     order.OrderSide     `json:"side"`
+	Quantity decimal.NullDecimal `json:"quantity"`
+	Volume   decimal.NullDecimal `json:"volume"`
+}
+
+type CalculateMarketOrderResult struct {
+	Quantity decimal.Decimal `json:"quantity"`
+	Locked   decimal.Decimal `json:"locked"`
+}
+
+func (ob *OrderBook) SubscribeCalcMarketOrder() {
+	config.Nats.Subscribe("finex:calc_market_order:"+ob.Symbol, func(m *nats.Msg) {
+		ob.orderMutex.Lock()
+		defer ob.orderMutex.Unlock()
+
+		var calc_market_order_payload *CalculateMarketOrder
+		json.Unmarshal(m.Data, &calc_market_order_payload)
+
+		side := calc_market_order_payload.Side
+		quantity := calc_market_order_payload.Quantity
+		volume := calc_market_order_payload.Volume
+
+		var book *redblacktree.Tree
+		if side == order.SideSell {
+			book = ob.Depth.Bids
+		} else {
+			book = ob.Depth.Asks
+		}
+
+		var expected decimal.Decimal
+		required := decimal.Zero
+		if quantity.Valid {
+			expected = quantity.Decimal
+		} else {
+			expected = volume.Decimal
+		}
+
+		if expected.IsZero() {
+			payload, _ := json.Marshal(CalculateMarketOrderResult{
+				Quantity: decimal.Zero,
+				Locked:   decimal.Zero,
+			})
+
+			m.Respond(payload)
+			return
+		}
+
+		order_quantity := decimal.Zero
+		it := book.Iterator()
+		for it.Next() && expected.IsPositive() {
+			o := it.Value().(order.Order)
+			var v decimal.Decimal
+
+			if quantity.Valid {
+				if o.Side == order.SideSell {
+					v = decimal.Min(o.Quantity, expected)
+				} else {
+					v = decimal.Min(o.Price.Mul(o.Quantity), expected)
+				}
+
+				expected = expected.Sub(o.Quantity)
+				required = required.Add(v)
+			} else {
+				// volume = 7
+				if o.Side == order.SideSell {
+					// Locked by quantity
+					v = decimal.Min(o.Quantity, expected)
+				} else {
+					// Locked by total
+					v = decimal.Min(o.Price.Mul(o.Quantity), expected)
+				}
+
+				expected = expected.Sub(o.Price.Mul(o.Quantity))
+				required = required.Add(v)
+			}
+			order_quantity = order_quantity.Add(o.Quantity)
+		}
+
+		if !expected.IsZero() {
+			payload, _ := json.Marshal(CalculateMarketOrderResult{
+				Quantity: decimal.Zero,
+				Locked:   decimal.Zero,
+			})
+
+			m.Respond(payload)
+			return
+		}
+
+		payload, _ := json.Marshal(CalculateMarketOrderResult{
+			Quantity: order_quantity,
+			Locked:   required,
+		})
+
+		m.Respond(payload)
+	})
 }
 
 func (ob *OrderBook) setMarketPrice(newPrice decimal.Decimal) {
@@ -172,6 +276,23 @@ func (ob *OrderBook) Remove(key *order.OrderKey) {
 	defer ob.matchMutex.Unlock()
 
 	ob.Depth.Remove(key)
+
+	if !key.Fake {
+		ob.PublishCancel(key)
+	}
+}
+
+func (ob *OrderBook) PublishCancel(key *order.OrderKey) error {
+	order_processor_message, err := json.Marshal(map[string]interface{}{
+		"action": pkg.ActionCancel,
+		"order":  key.ID,
+	})
+
+	if err != nil {
+		return err
+	}
+
+	return config.Nats.Publish("order_processor", order_processor_message)
 }
 
 func (ob *OrderBook) Match(maker *order.Order) {
@@ -239,7 +360,7 @@ func (ob *OrderBook) Match(maker *order.Order) {
 		}
 	}
 
-	if maker.UnfilledQuantity().IsPositive() {
+	if maker.UnfilledQuantity().IsPositive() && maker.Price.IsPositive() {
 		ob.Depth.Add(maker)
 		if maker.IsFake() {
 			if order_message, err := json.Marshal(maker); err == nil {

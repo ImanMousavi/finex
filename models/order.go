@@ -272,34 +272,17 @@ func CancelOrder(id uint64) error {
 
 // Submit order to matching engine
 func (o *Order) Submit() error {
-	LOCKING_BUFFER_FACTOR := decimal.NewFromFloat(1.1)
-	var locked decimal.Decimal
 	member_balance := o.MemberBalance()
 
-	cache_locked, err := o.ComputeLocked()
-
-	if err != nil {
-		return err
-	}
-
-	if o.OrdType == types.TypeMarket && o.Type == SideBuy {
-		locked = decimal.Min(cache_locked.Mul(LOCKING_BUFFER_FACTOR), member_balance)
-	} else {
-		locked = cache_locked
-	}
-
-	if member_balance.LessThan(locked) {
+	if member_balance.LessThan(o.Locked) {
 		return errors.New("market.account.insufficient_balance")
 	}
-
-	o.Locked = locked
-	o.OriginLocked = locked
 
 	config.DataBase.Save(&o)
 
 	order_processor_payload, _ := json.Marshal(map[string]interface{}{
 		"action": pkg.ActionSubmit,
-		"order":  o.ToMatchingAttributes(),
+		"id":     o.ID,
 	})
 
 	config.Nats.Publish("order_processor", order_processor_payload)

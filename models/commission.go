@@ -4,11 +4,12 @@ import (
 	"time"
 
 	"github.com/shopspring/decimal"
+	"github.com/zsmartex/finex/types"
 )
 
 type Commission struct {
 	ID              uint64
-	AccountType     string
+	AccountType     types.AccountType
 	MemberID        uint64
 	FriendUID       string
 	EarnAmount      decimal.Decimal

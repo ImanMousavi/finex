@@ -1,12 +1,17 @@
 package helpers
 
 import (
+	"encoding/json"
+	"time"
+
 	"github.com/gookit/validate"
 	"github.com/shopspring/decimal"
 
 	"github.com/zsmartex/finex/config"
+	"github.com/zsmartex/finex/matching"
 	"github.com/zsmartex/finex/models"
 	"github.com/zsmartex/finex/types"
+	"github.com/zsmartex/pkg/order"
 )
 
 type CreateOrderParams struct {
@@ -15,7 +20,8 @@ type CreateOrderParams struct {
 	OrdType   types.OrderType     `json:"ord_type" form:"ord_type" validate:"VaildateOrdType"`
 	Price     decimal.NullDecimal `json:"price" form:"price" validate:"VaildatePrice"`
 	StopPrice decimal.NullDecimal `json:"stop_price" form:"stop_price" validate:"VaildateStopPrice"`
-	Volume    decimal.Decimal     `json:"volume" form:"volume"`
+	Quantity  decimal.NullDecimal `json:"quantity" form:"quantity"`
+	Volume    decimal.NullDecimal `json:"volume" form:"volume"`
 }
 
 func (p CreateOrderParams) Messages() map[string]string {
@@ -91,6 +97,49 @@ func (p CreateOrderParams) BuildOrder(member *models.Member, err_src *Errors) *m
 	}
 
 	trading_fee := models.TradingFeeFor(member.Group, "spot", market.Symbol)
+	var quantity decimal.Decimal
+	var locked decimal.Decimal
+
+	if p.OrdType == types.TypeMarket {
+		var side order.OrderSide
+
+		if p.Side == types.SideBuy {
+			side = order.SideBuy
+		} else {
+			side = order.SideSell
+		}
+
+		payload, _ := json.Marshal(matching.CalculateMarketOrder{
+			Side:     side,
+			Quantity: p.Quantity,
+			Volume:   p.Volume,
+		})
+
+		msg, err := config.Nats.Request("finex:calc_market_order:"+market.Symbol, payload, 5*time.Second)
+		if err != nil {
+			err_src.Errors = append(err_src.Errors, "market.order.insufficient_market_liquidity")
+
+			return nil
+		}
+
+		var result matching.CalculateMarketOrderResult
+
+		json.Unmarshal(msg.Data, &result)
+
+		if result.Quantity.IsZero() || result.Locked.IsZero() {
+			err_src.Errors = append(err_src.Errors, "market.order.insufficient_market_liquidity")
+		}
+
+		quantity = result.Quantity
+		locked = result.Locked
+	} else {
+		quantity = p.Quantity.Decimal
+		if p.Side == types.SideBuy {
+			locked = p.Price.Decimal.Mul(p.Quantity.Decimal)
+		} else {
+			locked = p.Quantity.Decimal
+		}
+	}
 
 	order := &models.Order{
 		MemberID:     member.ID,
@@ -102,10 +151,12 @@ func (p CreateOrderParams) BuildOrder(member *models.Member, err_src *Errors) *m
 		Type:         order_side,
 		Price:        p.Price,
 		StopPrice:    p.StopPrice,
-		Volume:       p.Volume,
+		Volume:       quantity,
 		MakerFee:     trading_fee.Maker,
 		TakerFee:     trading_fee.Taker,
-		OriginVolume: p.Volume,
+		OriginVolume: quantity,
+		Locked:       locked,
+		OriginLocked: locked,
 	}
 
 	Vaildate(order, err_src)

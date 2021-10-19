@@ -6,12 +6,11 @@ import (
 	"github.com/zsmartex/finex/config"
 	"github.com/zsmartex/finex/models"
 	"github.com/zsmartex/pkg"
-	"github.com/zsmartex/pkg/order"
 )
 
 type OrderProcessorPayloadMessage struct {
 	Action pkg.PayloadAction `json:"action"`
-	Order  order.Order       `json:"order"`
+	ID     uint64            `json:"id"`
 }
 
 type OrderProcessorWorker struct {
@@ -39,13 +38,13 @@ func (w OrderProcessorWorker) Process(payload []byte) error {
 		return err
 	}
 
-	order := order_processor_payload.Order
+	id := order_processor_payload.ID
 
 	switch order_processor_payload.Action {
 	case pkg.ActionSubmit:
-		err = models.SubmitOrder(order.ID)
+		err = models.SubmitOrder(id)
 	case pkg.ActionCancel:
-		err = models.CancelOrder(order.ID)
+		err = models.CancelOrder(id)
 	}
 
 	if err != nil {
