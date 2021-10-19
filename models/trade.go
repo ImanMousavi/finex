@@ -331,7 +331,7 @@ func (t *Trade) RecordReferrals(seller_fee, buyer_fee decimal.Decimal, seller_or
 	for _, reward := range config.Referral.Rewards {
 		if !is_buyer_fake && buyer_fee.IsPositive() {
 			member := buyer_order.Member()
-			if member.HavingReferraller() {
+			if !member.HavingReferraller() {
 				break
 			}
 

@@ -141,6 +141,10 @@ func (p CreateOrderParams) BuildOrder(member *models.Member, err_src *Errors) *m
 		}
 	}
 
+	if err_src.Size() > 0 {
+		return nil
+	}
+
 	order := &models.Order{
 		MemberID:     member.ID,
 		Ask:          market.BaseUnit,

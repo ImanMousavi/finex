@@ -34,6 +34,10 @@ func (m *Member) HavingReferraller() bool {
 }
 
 func (m *Member) GetRefMember() *Member {
+	if !m.ReferralUID.Valid {
+		return nil
+	}
+
 	var member *Member
 
 	config.DataBase.First(&member, "uid = ?", m.ReferralUID)

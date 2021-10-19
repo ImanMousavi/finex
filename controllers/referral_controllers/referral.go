@@ -1,7 +1,6 @@
 package referral_controllers
 
 import (
-	"log"
 	"strconv"
 	"time"
 
@@ -63,8 +62,6 @@ func GetCommissions(c *fiber.Ctx) error {
 	errors := new(helpers.Errors)
 	params := new(queries.CommissionQueries)
 	if err := c.QueryParser(params); err != nil {
-		log.Println(err)
-
 		return c.Status(500).JSON(helpers.Errors{
 			Errors: []string{"server.method.invalid_query"},
 		})

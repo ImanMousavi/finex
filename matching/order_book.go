@@ -133,32 +133,26 @@ func (ob *OrderBook) SubscribeCalcMarketOrder() {
 		order_quantity := decimal.Zero
 		it := book.Iterator()
 		for it.Next() && expected.IsPositive() {
-			o := it.Value().(order.Order)
-			var v decimal.Decimal
+			pl := it.Value().(*PriceLevel)
 
 			if quantity.Valid {
-				if o.Side == order.SideSell {
-					v = decimal.Min(o.Quantity, expected)
-				} else {
-					v = decimal.Min(o.Price.Mul(o.Quantity), expected)
-				}
+				v := decimal.Min(pl.Total(), expected)
+				order_quantity = order_quantity.Add(v)
+				expected = expected.Sub(v)
 
-				expected = expected.Sub(o.Quantity)
-				required = required.Add(v)
+				if pl.Side == order.SideSell {
+					required = required.Add(pl.Price.Mul(v))
+				} else {
+					required = required.Add(v)
+				}
 			} else {
-				// volume = 7
-				if o.Side == order.SideSell {
-					// Locked by quantity
-					v = decimal.Min(o.Quantity, expected)
-				} else {
-					// Locked by total
-					v = decimal.Min(o.Price.Mul(o.Quantity), expected)
-				}
+				// Not ready now
+				v := decimal.Min(pl.Price.Mul(pl.Total()), expected)
 
-				expected = expected.Sub(o.Price.Mul(o.Quantity))
 				required = required.Add(v)
+				expected = expected.Sub(v)
+				order_quantity = order_quantity.Add(v.Div(pl.Price))
 			}
-			order_quantity = order_quantity.Add(o.Quantity)
 		}
 
 		if !expected.IsZero() {
@@ -285,7 +279,7 @@ func (ob *OrderBook) Remove(key *order.OrderKey) {
 func (ob *OrderBook) PublishCancel(key *order.OrderKey) error {
 	order_processor_message, err := json.Marshal(map[string]interface{}{
 		"action": pkg.ActionCancel,
-		"order":  key.ID,
+		"id":     key.ID,
 	})
 
 	if err != nil {
@@ -360,7 +354,7 @@ func (ob *OrderBook) Match(maker *order.Order) {
 		}
 	}
 
-	if maker.UnfilledQuantity().IsPositive() && maker.Price.IsPositive() {
+	if maker.UnfilledQuantity().IsPositive() && maker.Type == order.TypeLimit {
 		ob.Depth.Add(maker)
 		if maker.IsFake() {
 			if order_message, err := json.Marshal(maker); err == nil {
