@@ -55,7 +55,7 @@ type Order struct {
 	MakerFee      decimal.Decimal     `json:"maker_fee" gorm:"type:numeric(17,16)|default:0.0"`
 	TakerFee      decimal.Decimal     `json:"taker_fee" gorm:"type:numeric(17,16)|default:0.0"`
 	MarketID      string              `json:"market_id" validate:"required"`
-	MarketType    string              `json:"market_type" gorm:"default:spot"`
+	MarketType    types.AccountType   `json:"market_type" gorm:"default:spot" validate:"MarketTypeVaildator"`
 	State         OrderState          `json:"state"`
 	Type          OrderSide           `json:"type" validate:"required"`
 	OrdType       types.OrderType     `json:"ord_type" validate:"OrdTypeVaildator"`
@@ -146,6 +146,18 @@ func (o Order) OrdTypeVaildator(ord_type types.OrderType) bool {
 	}
 
 	return true
+}
+
+func (o Order) MarketTypeVaildator(market_type types.AccountType) bool {
+	supported_market_types := []types.AccountType{types.AccountTypeSpot, types.AccountTypeMargin, types.AccountTypeFutures}
+
+	for _, t := range supported_market_types {
+		if t == market_type {
+			return true
+		}
+	}
+
+	return false
 }
 
 func (o *Order) Market() *Market {

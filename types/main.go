@@ -63,7 +63,8 @@ var (
 type AccountType string
 
 var (
-	SpotAcccountType   AccountType = "spot"
-	P2PAcccountType    AccountType = "p2p"
-	MarginAcccountType AccountType = "margin"
+	AccountTypeSpot    AccountType = "spot"
+	AccountTypeP2P     AccountType = "p2p"
+	AccountTypeMargin  AccountType = "margin"
+	AccountTypeFutures AccountType = "futures"
 )

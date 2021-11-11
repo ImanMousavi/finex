@@ -6,6 +6,7 @@ import (
 	"github.com/shopspring/decimal"
 
 	"github.com/zsmartex/finex/config"
+	"github.com/zsmartex/finex/types"
 )
 
 type TradingFee struct {
@@ -14,7 +15,7 @@ type TradingFee struct {
 	Group      string
 	Maker      decimal.Decimal
 	Taker      decimal.Decimal
-	MarketType string
+	MarketType types.AccountType
 	CreatedAt  time.Time
 	UpdatedAt  time.Time
 }
@@ -26,13 +27,13 @@ type TradingFee struct {
 //  3. market_id match
 //  4. both group and market_id are 'any'
 //  5. default (zero fees)
-func TradingFeeFor(group, market_type, market_id string) *TradingFee {
+func TradingFeeFor(group string, market_type types.AccountType, market_id string) *TradingFee {
 	var trading_fees []*TradingFee
 
 	config.DataBase.Where(
 		"\"market_id\" IN ? AND \"market_type\" IN ? AND \"group\" IN ?",
 		[]string{market_id, "any"},
-		[]string{market_type, "any"},
+		[]string{string(market_type), "any"},
 		[]string{group, "any"},
 	).Find(&trading_fees)
 

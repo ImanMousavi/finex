@@ -8,18 +8,20 @@ import (
 	"github.com/shopspring/decimal"
 	"github.com/zsmartex/finex/config"
 	"github.com/zsmartex/finex/mq_client"
+	"github.com/zsmartex/finex/types"
 	"gorm.io/gorm"
 )
 
 var Zero float64 = 0
 
 type Account struct {
-	MemberID   uint64          `json:"member_id"`
-	CurrencyID string          `json:"currency_id"`
-	Balance    decimal.Decimal `json:"balance" validate:"ValidateBalance"`
-	Locked     decimal.Decimal `json:"locked" validate:"ValidateLocked"`
-	CreatedAt  time.Time       `json:"created_at"`
-	UpdatedAt  time.Time       `json:"updated_at"`
+	MemberID   uint64            `json:"member_id"`
+	CurrencyID string            `json:"currency_id"`
+	Balance    decimal.Decimal   `json:"balance" validate:"ValidateBalance"`
+	Locked     decimal.Decimal   `json:"locked" validate:"ValidateLocked"`
+	Type       types.AccountType `json:"type" gorm:"default:spot"`
+	CreatedAt  time.Time         `json:"created_at"`
+	UpdatedAt  time.Time         `json:"updated_at"`
 }
 
 func (a Account) ValidateBalance(Balance decimal.Decimal) bool {

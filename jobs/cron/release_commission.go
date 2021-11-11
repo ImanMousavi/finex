@@ -62,7 +62,7 @@ func releaseReferrals() {
 		earned_btc := earned_usdt.DivRound(btc_currency.Price, 8)
 
 		release_commission := &models.ReleaseCommission{
-			AccountType: types.SpotAcccountType,
+			AccountType: types.AccountTypeSpot,
 			MemberID:    group_referral.MemberID,
 			EarnedBTC:   earned_btc,
 			FriendTrade: group_referral.FriendTrade,
@@ -90,7 +90,7 @@ func releaseReferrals() {
 			config.DataBase.Model(&release_referral).Update("friend", group_user_referral.Friend)
 		} else {
 			release_commission := &models.ReleaseCommission{
-				AccountType: types.SpotAcccountType,
+				AccountType: types.AccountTypeSpot,
 				MemberID:    member.ID,
 				EarnedBTC:   decimal.Zero,
 				FriendTrade: 0,

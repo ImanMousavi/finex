@@ -150,6 +150,7 @@ func (p CreateOrderParams) BuildOrder(member *models.Member, err_src *Errors) *m
 		Ask:          market.BaseUnit,
 		Bid:          market.QuoteUnit,
 		MarketID:     market.Symbol,
+		MarketType:   types.AccountTypeSpot,
 		OrdType:      p.OrdType,
 		State:        models.StatePending,
 		Type:         order_side,
