@@ -64,6 +64,7 @@ func CreateIEO(c *fiber.Ctx) error {
 	}
 
 	ieo := &models.IEO{
+		Description:         payload.Description,
 		CurrencyID:          payload.CurrencyID,
 		MainPaymentCurrency: payload.MainPaymentCurrency,
 		Price:               payload.Price,
@@ -71,6 +72,7 @@ func CreateIEO(c *fiber.Ctx) error {
 		State:               payload.State,
 		StartTime:           time.Unix(payload.StartTime, 0),
 		EndTime:             time.Unix(payload.EndTime, 0),
+		Data:                payload.Data,
 	}
 
 	config.DataBase.Create(&ieo)
@@ -97,12 +99,14 @@ func UpdateIEO(c *fiber.Ctx) error {
 		})
 	}
 
+	ieo.Description = payload.Description
 	ieo.MainPaymentCurrency = payload.MainPaymentCurrency
 	ieo.Price = payload.Price
 	ieo.MinAmount = payload.MinAmount
 	ieo.State = payload.State
 	ieo.StartTime = time.Unix(payload.StartTime, 0)
 	ieo.EndTime = time.Unix(payload.EndTime, 0)
+	ieo.Data = payload.Data
 
 	config.DataBase.Save(&ieo)
 

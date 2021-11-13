@@ -96,13 +96,13 @@ func CreateIEOOrder(c *fiber.Ctx) error {
 		State:    models.StatePending,
 	}
 
-	config.DataBase.Create(&ieo_order)
-
 	member_balance := ieo_order.MemberBalance()
 
 	if member_balance.LessThan(ieo_order.Total()) {
 		return errors.New("market.account.insufficient_balance")
 	}
+
+	config.DataBase.Create(&ieo_order)
 
 	payload_ieo_order_processor_attrs, _ := json.Marshal(ieo_order)
 	config.Nats.Publish("ieo_order_processor", payload_ieo_order_processor_attrs)

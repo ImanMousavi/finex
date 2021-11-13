@@ -12,11 +12,13 @@ type IEO struct {
 	ID                  int64             `json:"id"`
 	CurrencyID          string            `json:"currency_id"`
 	MainPaymentCurrency string            `json:"main_payment_currency"`
+	Description         string            `json:"description"`
 	Price               decimal.Decimal   `json:"price"`
 	MinAmount           decimal.Decimal   `json:"min_amount"`
 	State               types.MarketState `json:"state"`
 	StartTime           time.Time         `json:"start_time"`
 	EndTime             time.Time         `json:"end_time"`
+	Data                string            `json:"data"`
 	CreatedAt           time.Time         `json:"created_at"`
 	UpdatedAt           time.Time         `json:"updated_at"`
 }
