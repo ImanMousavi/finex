@@ -5,22 +5,24 @@ import (
 
 	"github.com/shopspring/decimal"
 	"github.com/zsmartex/finex/config"
-	"github.com/zsmartex/finex/models/datatypes"
 	"github.com/zsmartex/finex/types"
 )
 
 type IEO struct {
-	ID                  uint64                         `json:"id"`
-	CurrencyID          string                         `json:"currency_id"`
-	MainPaymentCurrency string                         `json:"main_payment_currency"`
-	Price               decimal.Decimal                `json:"price"`
-	PaymentCurrencies   datatypes.IEOPaymentCurrencies `json:"payment_currencies"`
-	MinAmount           decimal.Decimal                `json:"min_amount"`
-	State               types.MarketState              `json:"state"`
-	StartTime           time.Time                      `json:"start_time"`
-	EndTime             time.Time                      `json:"end_time"`
-	CreatedAt           time.Time                      `json:"created_at"`
-	UpdatedAt           time.Time                      `json:"updated_at"`
+	ID                  int64             `json:"id"`
+	CurrencyID          string            `json:"currency_id"`
+	MainPaymentCurrency string            `json:"main_payment_currency"`
+	Price               decimal.Decimal   `json:"price"`
+	MinAmount           decimal.Decimal   `json:"min_amount"`
+	State               types.MarketState `json:"state"`
+	StartTime           time.Time         `json:"start_time"`
+	EndTime             time.Time         `json:"end_time"`
+	CreatedAt           time.Time         `json:"created_at"`
+	UpdatedAt           time.Time         `json:"updated_at"`
+}
+
+func (IEO) TableName() string {
+	return "ieos"
 }
 
 func (m *IEO) IsEnabled() bool {
@@ -33,6 +35,14 @@ func (m *IEO) IsEnded() bool {
 
 func (m *IEO) IsStarted() bool {
 	return time.Now().After(m.StartTime)
+}
+
+func (m *IEO) PaymentCurrencies() []*Currency {
+	var currencies []*Currency
+
+	config.DataBase.Find(&currencies, "id IN (SELECT currency_id FROM ieo_currencies WHERE ieo_id = ?)", m.ID)
+
+	return currencies
 }
 
 func (m *IEO) GetPriceByParent(currency_id string) decimal.Decimal {

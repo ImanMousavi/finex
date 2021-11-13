@@ -23,10 +23,13 @@ type IEOOrder struct {
 	Bid       string
 	Price     decimal.Decimal
 	Quantity  decimal.Decimal
-	Bouns     decimal.Decimal
 	State     OrderState
 	CreatedAt time.Time
 	UpdatedAt time.Time
+}
+
+func (IEOOrder) TableName() string {
+	return "ieo_orders"
 }
 
 func (o *IEOOrder) MemberBalance() decimal.Decimal {
@@ -151,9 +154,6 @@ func (o *IEOOrder) Strike() error {
 		if err := outcome_account.UnlockAndSubFunds(account_tx, o.Total()); err != nil {
 			return err
 		}
-		if err := income_account.PlusFunds(account_tx, o.Quantity.Add(o.Quantity.Mul(o.Bouns))); err != nil {
-			return err
-		}
 
 		o.State = StateDone
 
@@ -217,7 +217,6 @@ func (o *IEOOrder) ToJSON() *IEOOrderJSON {
 		Bid:       o.Bid,
 		Price:     o.Price,
 		Quantity:  o.Quantity,
-		Bouns:     o.Bouns,
 		State:     o.State,
 		CreatedAt: o.CreatedAt,
 		UpdatedAt: o.UpdatedAt,

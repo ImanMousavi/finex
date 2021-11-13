@@ -19,11 +19,6 @@ func ValidateIEOPayload(payload *queries.IEOPayload) *helpers.Errors {
 	}
 
 	validated_main_currency := false
-	for _, v := range payload.PaymentCurrencies {
-		if v.Currency == payload.MainPaymentCurrency {
-			validated_main_currency = true
-		}
-	}
 
 	if !validated_main_currency {
 		e.Errors = append(e.Errors, "Main Currency must be includes in Payment Currencies")
@@ -58,7 +53,7 @@ func GetIEOList(c *fiber.Ctx) error {
 
 func CreateIEO(c *fiber.Ctx) error {
 	var payload *queries.IEOPayload
-	if err := c.QueryParser(&payload); err != nil {
+	if err := c.BodyParser(&payload); err != nil {
 		return c.Status(422).JSON(helpers.Errors{
 			Errors: []string{"server.method.invalid_message_body"},
 		})
@@ -69,11 +64,9 @@ func CreateIEO(c *fiber.Ctx) error {
 	}
 
 	ieo := &models.IEO{
-		ID:                  payload.ID,
 		CurrencyID:          payload.CurrencyID,
 		MainPaymentCurrency: payload.MainPaymentCurrency,
 		Price:               payload.Price,
-		PaymentCurrencies:   payload.PaymentCurrencies,
 		MinAmount:           payload.MinAmount,
 		State:               payload.State,
 		StartTime:           time.Unix(payload.StartTime, 0),
@@ -87,7 +80,7 @@ func CreateIEO(c *fiber.Ctx) error {
 
 func UpdateIEO(c *fiber.Ctx) error {
 	var payload *queries.IEOPayload
-	if err := c.QueryParser(&payload); err != nil {
+	if err := c.BodyParser(&payload); err != nil {
 		return c.Status(422).JSON(helpers.Errors{
 			Errors: []string{"server.method.invalid_message_body"},
 		})
@@ -106,7 +99,6 @@ func UpdateIEO(c *fiber.Ctx) error {
 
 	ieo.MainPaymentCurrency = payload.MainPaymentCurrency
 	ieo.Price = payload.Price
-	ieo.PaymentCurrencies = payload.PaymentCurrencies
 	ieo.MinAmount = payload.MinAmount
 	ieo.State = payload.State
 	ieo.StartTime = time.Unix(payload.StartTime, 0)
@@ -133,6 +125,62 @@ func DeleteIEO(c *fiber.Ctx) error {
 	}
 
 	config.DataBase.Delete(&ieo)
+
+	return c.Status(200).JSON(200)
+}
+
+type PayloadIEOCurrency struct {
+	ID         int64    `json:"id"`
+	Currencies []string `json:"currencies"`
+}
+
+func AddIEOCurrencies(c *fiber.Ctx) error {
+	var payload *PayloadIEOCurrency
+
+	if err := c.BodyParser(&payload); err != nil {
+		return c.Status(422).JSON(helpers.Errors{
+			Errors: []string{"server.method.invalid_message_body"},
+		})
+	}
+
+	var ieo *models.IEO
+	if result := config.DataBase.First(&ieo, payload.ID); result.Error != nil {
+		return c.Status(404).JSON(helpers.Errors{
+			Errors: []string{"record.not_found"},
+		})
+	}
+
+	for _, currency_id := range payload.Currencies {
+		ieo_currency := &models.IEOCurrency{
+			CurrencyID: currency_id,
+			IEOID:      ieo.ID,
+		}
+
+		config.DataBase.Create(&ieo_currency)
+	}
+
+	return c.Status(200).JSON(200)
+}
+
+func RemoveIEOCurrencies(c *fiber.Ctx) error {
+	var payload *PayloadIEOCurrency
+
+	if err := c.BodyParser(&payload); err != nil {
+		return c.Status(422).JSON(helpers.Errors{
+			Errors: []string{"server.method.invalid_message_body"},
+		})
+	}
+
+	var ieo *models.IEO
+	if result := config.DataBase.First(&ieo, payload.ID); result.Error != nil {
+		return c.Status(404).JSON(helpers.Errors{
+			Errors: []string{"record.not_found"},
+		})
+	}
+
+	for _, currency_id := range payload.Currencies {
+		config.DataBase.Where("currency_id = ? AND ieo_id = ?", currency_id, ieo.ID).Delete(&models.IEOCurrency{})
+	}
 
 	return c.Status(200).JSON(200)
 }

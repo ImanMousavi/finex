@@ -30,6 +30,8 @@ func SetupRouter() *fiber.App {
 		api_v2_admin.Post("/ieo", admin_controllers.CreateIEO)
 		api_v2_admin.Put("/ieo", admin_controllers.UpdateIEO)
 		api_v2_admin.Delete("/ieo", admin_controllers.DeleteIEO)
+		api_v2_admin.Post("/ieo/currencies", admin_controllers.AddIEOCurrencies)
+		api_v2_admin.Delete("/ieo/currencies", admin_controllers.RemoveIEOCurrencies)
 	}
 
 	api_v2_market := app.Group("/api/v2/market", middlewares.Authenticate)

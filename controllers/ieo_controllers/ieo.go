@@ -10,7 +10,6 @@ import (
 	"github.com/zsmartex/finex/config"
 	"github.com/zsmartex/finex/controllers/helpers"
 	"github.com/zsmartex/finex/models"
-	"github.com/zsmartex/finex/models/datatypes"
 	"gorm.io/gorm"
 )
 
@@ -55,7 +54,7 @@ func CreateIEOOrder(c *fiber.Ctx) error {
 		})
 	}
 
-	if payload.QuoteCurrency == strings.ToLower(payload.QuoteCurrency) {
+	if payload.QuoteCurrency != strings.ToLower(payload.QuoteCurrency) {
 		return c.Status(422).JSON(helpers.Errors{
 			Errors: []string{"market.ieo.invalid_quote_currency"},
 		})
@@ -73,12 +72,10 @@ func CreateIEOOrder(c *fiber.Ctx) error {
 		})
 	}
 
-	var payment_currency *datatypes.IEOPaymentCurrency
-
+	var payment_currency *models.Currency
 	found_payment_currency := false
-	for _, pu := range ieo.PaymentCurrencies {
-		if pu.Currency == payload.QuoteCurrency {
-			payment_currency = &pu
+	for _, c := range ieo.PaymentCurrencies() {
+		if c.ID == payload.QuoteCurrency {
 			found_payment_currency = true
 		}
 	}
@@ -94,9 +91,8 @@ func CreateIEOOrder(c *fiber.Ctx) error {
 		MemberID: CurrentUser.ID,
 		Ask:      ieo.CurrencyID,
 		Bid:      payload.QuoteCurrency,
-		Price:    ieo.GetPriceByParent(payment_currency.Currency),
+		Price:    ieo.GetPriceByParent(payment_currency.ID),
 		Quantity: payload.Quantity,
-		Bouns:    payment_currency.Bouns,
 		State:    models.StatePending,
 	}
 

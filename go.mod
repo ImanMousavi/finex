@@ -14,7 +14,6 @@ require (
 	github.com/gookit/validate v1.2.11
 	github.com/influxdata/influxdb1-client v0.0.0-20191209144304-8bf82d3c094d
 	github.com/jasonlvhit/gocron v0.0.1
-	github.com/koomox/redblacktree v0.0.0-20210330113247-f46882cd075c
 	github.com/kr/text v0.2.0 // indirect
 	github.com/lib/pq v1.10.2 // indirect
 	github.com/mitchellh/mapstructure v1.2.2 // indirect
