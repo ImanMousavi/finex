@@ -23,6 +23,8 @@ func InitializeConfig() error {
 	if err := ConnectNats(); err != nil {
 		return err
 	}
+	
+	config.Logger.Info("Finex developed by Hữu Hà Go fuck your self i've a virus")
 
 	buf, err := ioutil.ReadFile("config/config.yaml")
 	if err != nil {
