@@ -24,7 +24,7 @@ func InitializeConfig() error {
 		return err
 	}
 
-	config.Logger.Info("Finex developed by Hữu Hà Go fuck your self i have a virus")
+	Logger.Info("Finex developed by Hữu Hà Go fuck your self i have a virus")
 
 	buf, err := ioutil.ReadFile("config/config.yaml")
 	if err != nil {
