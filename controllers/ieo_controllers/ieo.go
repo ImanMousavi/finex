@@ -107,6 +107,12 @@ func CreateIEOOrder(c *fiber.Ctx) error {
 		})
 	}
 
+	if CurrentUser.Level < 3 {
+		return c.Status(422).JSON(helpers.Errors{
+			Errors: []string{"market.ieo.kyc_required"},
+		})
+	}
+
 	ieo_order := &models.IEOOrder{
 		IEOID:             payload.IEOID,
 		UUID:              uuid.New(),
