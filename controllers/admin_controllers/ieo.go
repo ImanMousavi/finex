@@ -28,6 +28,7 @@ func IEOToEntity(ieo *models.IEO) *entities.IEO {
 		EndTime:             ieo.EndTime.Unix(),
 		Data:                ieo.Data,
 		BannerUrl:           ieo.BannerUrl,
+		LimitPerUser:        ieo.LimitPerUser,
 		CreatedAt:           ieo.CreatedAt,
 		UpdatedAt:           ieo.UpdatedAt,
 	}
