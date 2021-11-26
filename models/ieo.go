@@ -77,7 +77,7 @@ func (m *IEO) GetPriceByParent(currency_id string) decimal.Decimal {
 
 func (m *IEO) MemberBoughtQuantity(member_id int64) decimal.Decimal {
 	var orders []*IEOOrder
-	config.DataBase.Find(&orders, "member_id = ? AND state = ?", member_id, StateDone)
+	config.DataBase.Find(&orders, "ieo_id = ? member_id = ? AND state = ?", m.ID, member_id, StateDone)
 
 	user_bought_quantity := decimal.Decimal{}
 	for _, order := range orders {
