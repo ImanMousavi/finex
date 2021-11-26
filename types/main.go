@@ -5,7 +5,7 @@ import "github.com/shopspring/decimal"
 type Depth struct {
 	Asks     [][]decimal.Decimal `json:"asks"`
 	Bids     [][]decimal.Decimal `json:"bids"`
-	Sequence uint64              `json:"sequence"`
+	Sequence int64               `json:"sequence"`
 }
 
 type OrderSide string
@@ -56,7 +56,7 @@ type ConfigReferralReward struct {
 type MarketState string
 
 var (
-	MarketStateEndabled MarketState = "endabled"
+	MarketStateEndabled MarketState = "enabled"
 	MarketStateDisabled MarketState = "disabled"
 )
 

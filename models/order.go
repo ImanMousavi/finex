@@ -42,27 +42,27 @@ const (
 )
 
 type Order struct {
-	ID            uint64              `json:"id" gorm:"primaryKey"`
+	ID            int64               `json:"id" gorm:"primaryKey"`
 	UUID          uuid.UUID           `json:"uuid" gorm:"default:gen_random_uuid()"`
-	MemberID      uint64              `json:"member_id" validate:"required"`
+	MemberID      int64               `json:"member_id" validate:"required"`
 	Ask           string              `json:"ask" validate:"required"`
 	Bid           string              `json:"bid" validate:"required"`
 	RemoteId      sql.NullString      `json:"remote_id"`
-	Price         decimal.NullDecimal `json:"price" gorm:"type:numeric(32,16)" validate:"PriceVaildator"`
-	StopPrice     decimal.NullDecimal `json:"stop_price" gorm:"type:numeric(32,16)" validate:"StopPriceVaildator"`
-	Volume        decimal.Decimal     `json:"volume" gorm:"type:numeric(32,16)" validate:"required"`
-	OriginVolume  decimal.Decimal     `json:"origin_volume" gorm:"type:numeric(32,16)" validate:"OriginVolumeVaildator"`
-	MakerFee      decimal.Decimal     `json:"maker_fee" gorm:"type:numeric(17,16)|default:0.0"`
-	TakerFee      decimal.Decimal     `json:"taker_fee" gorm:"type:numeric(17,16)|default:0.0"`
+	Price         decimal.NullDecimal `json:"price" validate:"PriceVaildator"`
+	StopPrice     decimal.NullDecimal `json:"stop_price" validate:"StopPriceVaildator"`
+	Volume        decimal.Decimal     `json:"volume" validate:"required"`
+	OriginVolume  decimal.Decimal     `json:"origin_volume" validate:"OriginVolumeVaildator"`
+	MakerFee      decimal.Decimal     `json:"maker_fee" gorm:"default:0.0"`
+	TakerFee      decimal.Decimal     `json:"taker_fee" gorm:"default:0.0"`
 	MarketID      string              `json:"market_id" validate:"required"`
 	MarketType    types.AccountType   `json:"market_type" gorm:"default:spot" validate:"MarketTypeVaildator"`
 	State         OrderState          `json:"state"`
 	Type          OrderSide           `json:"type" validate:"required"`
 	OrdType       types.OrderType     `json:"ord_type" validate:"OrdTypeVaildator"`
-	Locked        decimal.Decimal     `json:"locked" gorm:"type:numeric(32,16)|default:0.0"`
-	OriginLocked  decimal.Decimal     `json:"origin_locked" gorm:"type:numeric(32,16)|default:0.0"`
-	FundsReceived decimal.Decimal     `json:"funds_received" gorm:"type:numeric(32,16)|default:0.0"`
-	TradesCount   uint64              `json:"trades_count" gorm:"default:0"`
+	Locked        decimal.Decimal     `json:"locked" gorm:"default:0.0"`
+	OriginLocked  decimal.Decimal     `json:"origin_locked" gorm:"default:0.0"`
+	FundsReceived decimal.Decimal     `json:"funds_received" gorm:"default:0.0"`
+	TradesCount   int64               `json:"trades_count" gorm:"default:0"`
 	CreatedAt     time.Time           `json:"created_at"`
 	UpdatedAt     time.Time           `json:"updated_at"`
 }
@@ -202,7 +202,7 @@ func GetDepth(side OrderSide, market string) [][]decimal.Decimal {
 	return depth
 }
 
-func SubmitOrder(id uint64) error {
+func SubmitOrder(id int64) error {
 	var account *Account
 	var order *Order
 
@@ -250,7 +250,7 @@ func SubmitOrder(id uint64) error {
 	return nil
 }
 
-func CancelOrder(id uint64) error {
+func CancelOrder(id int64) error {
 	var account *Account
 	var order *Order
 

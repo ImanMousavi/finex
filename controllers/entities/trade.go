@@ -8,7 +8,7 @@ import (
 )
 
 type TradeEntity struct {
-	ID          uint64          `json:"id"`
+	ID          int64           `json:"id"`
 	Market      string          `json:"market"`
 	Price       decimal.Decimal `json:"price"`
 	Amount      decimal.Decimal `json:"amount"`
@@ -18,6 +18,6 @@ type TradeEntity struct {
 	FeeAmount   decimal.Decimal `json:"fee_amount"`
 	TakerType   types.TakerType `json:"taker_type"`
 	Side        types.TakerType `json:"side"`
-	OrderID     uint64          `json:"order_id"`
+	OrderID     int64           `json:"order_id"`
 	CreatedAt   time.Time       `json:"created_at"`
 }

@@ -8,7 +8,7 @@ import (
 )
 
 type TradeEntity struct {
-	ID     uint64          `json:"id"`
+	ID     int64           `json:"id"`
 	Price  decimal.Decimal `json:"price"`
 	Amount decimal.Decimal `json:"amount"`
 	Total  decimal.Decimal `json:"total"`

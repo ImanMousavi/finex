@@ -2,10 +2,12 @@ package matching
 
 import (
 	"encoding/json"
+	"os"
 	"sync"
 	"time"
 
 	"github.com/shopspring/decimal"
+	"github.com/streadway/amqp"
 	"github.com/zsmartex/finex/config"
 	"github.com/zsmartex/finex/mq_client"
 	"github.com/zsmartex/pkg"
@@ -18,9 +20,11 @@ type Book struct {
 }
 
 type Notification struct {
-	Symbol      string // instrument name
-	Sequence    uint64
-	BookCache   *Book // cache for notify to websocket
+	Symbol    string // instrument name
+	Sequence  int64
+	BookCache *Book // cache for notify to websocket
+
+	Channel     *amqp.Channel
 	NotifyMutex sync.RWMutex
 }
 
@@ -36,6 +40,18 @@ func NewNotification(symbol string) *Notification {
 
 	config.Redis.GetKey("finex:"+symbol+":depth:sequence", &notification.Sequence)
 
+	amqp_connection, err := mq_client.CreateAMQP()
+	if err != nil {
+		panic(err)
+	}
+
+	channel, err := amqp_connection.Channel()
+	if err != nil {
+		panic(err)
+	}
+
+	notification.Channel = channel
+
 	notification.Start()
 
 	return notification
@@ -46,16 +62,6 @@ func (n *Notification) Start() {
 }
 
 func (n *Notification) StartLoop() {
-	amqp_connection, err := mq_client.CreateAMQP()
-	if err != nil {
-		return
-	}
-
-	channel, err := amqp_connection.Channel()
-	if err != nil {
-		return
-	}
-
 	for {
 		time.Sleep(100 * time.Millisecond)
 
@@ -86,8 +92,14 @@ func (n *Notification) StartLoop() {
 			config.Logger.Errorf("Error: %s", err.Error())
 		}
 
-		if err := mq_client.ChanEnqueueEvent(channel, "public", n.Symbol, "depth", payload_message); err != nil {
-			config.Logger.Errorf("Error: %s", err.Error())
+		if os.Getenv("UI") == "BASEAPP" {
+			if err := mq_client.ChanEnqueueEvent(n.Channel, "public", n.Symbol, "ob-inc", payload_message); err != nil {
+				config.Logger.Errorf("Error: %s", err.Error())
+			}
+		} else {
+			if err := mq_client.ChanEnqueueEvent(n.Channel, "public", n.Symbol, "depth", payload_message); err != nil {
+				config.Logger.Errorf("Error: %s", err.Error())
+			}
 		}
 
 		n.BookCache.Asks = make([][]decimal.Decimal, 0)

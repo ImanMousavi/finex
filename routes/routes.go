@@ -6,6 +6,7 @@ import (
 
 	"github.com/zsmartex/finex/controllers"
 	"github.com/zsmartex/finex/controllers/admin_controllers"
+	"github.com/zsmartex/finex/controllers/ieo_controllers"
 	"github.com/zsmartex/finex/controllers/market_controllers"
 	"github.com/zsmartex/finex/controllers/referral_controllers"
 	"github.com/zsmartex/finex/routes/middlewares"
@@ -20,6 +21,7 @@ func SetupRouter() *fiber.App {
 		api_v2_public.Get("/timestamp", controllers.GetTimestamp)
 		api_v2_public.Get("/global_price", controllers.GetGlobalPrice)
 		api_v2_public.Get("/ieo/list", controllers.GetIEOList)
+		api_v2_public.Get("/ieo/:id", controllers.GetIEO)
 		api_v2_public.Get("/markets/:market/depth", controllers.GetDepth)
 	}
 
@@ -27,6 +29,7 @@ func SetupRouter() *fiber.App {
 	{
 		api_v2_admin.Get("/trades", admin_controllers.GetTrades)
 		api_v2_admin.Get("/ieo/list", admin_controllers.GetIEOList)
+		api_v2_admin.Get("/ieo/:id", admin_controllers.GetIEO)
 		api_v2_admin.Post("/ieo", admin_controllers.CreateIEO)
 		api_v2_admin.Put("/ieo", admin_controllers.UpdateIEO)
 		api_v2_admin.Delete("/ieo", admin_controllers.DeleteIEO)
@@ -42,6 +45,12 @@ func SetupRouter() *fiber.App {
 		api_v2_market.Post("/orders/:uuid/cancel", market_controllers.CancelOrderByUUID)
 		api_v2_market.Post("/orders/cancel", market_controllers.CancelAllOrders)
 		api_v2_market.Get("/trades", market_controllers.GetTrades)
+	}
+
+	api_v2_ieo := app.Group("/api/v2/ieo", middlewares.Authenticate)
+	{
+		api_v2_ieo.Post("/", ieo_controllers.CreateIEOOrder)
+		api_v2_ieo.Get("/:id", ieo_controllers.GetIEO)
 	}
 
 	api_v2_referral := app.Group("/api/v2/referral", middlewares.Authenticate)

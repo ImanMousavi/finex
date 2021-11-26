@@ -15,10 +15,10 @@ import (
 var Zero float64 = 0
 
 type Account struct {
-	MemberID   uint64            `json:"member_id"`
+	MemberID   int64             `json:"member_id"`
 	CurrencyID string            `json:"currency_id"`
-	Balance    decimal.Decimal   `json:"balance" validate:"ValidateBalance"`
-	Locked     decimal.Decimal   `json:"locked" validate:"ValidateLocked"`
+	Balance    decimal.Decimal   `json:"balance" gorm:"default:0" validate:"ValidateBalance"`
+	Locked     decimal.Decimal   `json:"locked" gorm:"default:0" validate:"ValidateLocked"`
 	Type       types.AccountType `json:"type" gorm:"default:spot"`
 	CreatedAt  time.Time         `json:"created_at"`
 	UpdatedAt  time.Time         `json:"updated_at"`

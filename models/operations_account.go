@@ -18,7 +18,7 @@ var (
 )
 
 type OperationsAccount struct {
-	ID           uint64
+	ID           int64
 	Code         int32
 	Type         OperationType
 	Kind         string

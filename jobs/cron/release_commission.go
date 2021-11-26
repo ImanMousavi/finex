@@ -20,12 +20,12 @@ func (j *ReleaseCommissionJob) Process() {
 }
 
 type GroupReferral struct {
-	FriendTrade uint64
-	MemberID    uint64
+	FriendTrade int64
+	MemberID    int64
 }
 
 type GroupUserReferral struct {
-	Friend uint64
+	Friend int64
 	UID    string
 }
 

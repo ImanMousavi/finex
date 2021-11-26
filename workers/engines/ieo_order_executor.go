@@ -10,12 +10,12 @@ import (
 type IEOOrderExecutorWorker struct {
 }
 
-func NewIEOOrderExecutorWorker() *IEOOrderProcessorWorker {
-	return &IEOOrderProcessorWorker{}
+func NewIEOOrderExecutorWorker() *IEOOrderExecutorWorker {
+	return &IEOOrderExecutorWorker{}
 }
 
 func (w *IEOOrderExecutorWorker) Process(payload []byte) error {
-	var payload_ieo_order_message *models.IEOOrder
+	var payload_ieo_order_message *models.IEOOrderJSON
 	if err := json.Unmarshal(payload, &payload_ieo_order_message); err != nil {
 		return err
 	}

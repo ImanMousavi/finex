@@ -4,7 +4,7 @@ import (
 	"time"
 )
 
-type IEOCurrency struct {
+type IEOPaymentCurrency struct {
 	ID         int64     `json:"id"`
 	CurrencyID string    `json:"currency"`
 	IEOID      int64     `json:"ieo_id" gorm:"column:ieo_id"`
@@ -12,6 +12,6 @@ type IEOCurrency struct {
 	UpdatedAt  time.Time `json:"updated_at"`
 }
 
-func (IEOCurrency) TableName() string {
-	return "ieo_currencies"
+func (IEOPaymentCurrency) TableName() string {
+	return "ieo_payment_currencies"
 }

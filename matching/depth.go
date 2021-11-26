@@ -2,16 +2,23 @@ package matching
 
 import (
 	"encoding/json"
+	"os"
 	"sync"
+	"time"
 
 	"github.com/emirpasic/gods/trees/redblacktree"
 	"github.com/nats-io/nats.go"
 	"github.com/shopspring/decimal"
 
 	"github.com/zsmartex/finex/config"
+	"github.com/zsmartex/finex/mq_client"
 	"github.com/zsmartex/pkg"
 	"github.com/zsmartex/pkg/order"
 )
+
+var MIN_PERIOD_TO_SNAPSHOT = 10 * time.Second
+var MAX_PERIOD_TO_SNAPSHOT = 60 * time.Second
+var MIN_INCREMENT_COUNT_TO_SNAPSHOT int64 = 20
 
 type Depth struct {
 	depthMutex       sync.Mutex
@@ -21,6 +28,11 @@ type Depth struct {
 	Asks         *redblacktree.Tree
 	Bids         *redblacktree.Tree
 	Notification *Notification
+
+	// default peatio ws
+	SnapshotTime   time.Time
+	IncrementCount int64
+	// close
 }
 
 func NewDepth(symbol string) *Depth {
@@ -59,7 +71,7 @@ func (d *Depth) Add(o *order.Order) {
 
 	price_level := value.(*PriceLevel)
 	price_level.Add(o)
-	d.Notification.Publish(price_level.Side, price_level.Price, price_level.Total())
+	d.PublishIncrement(price_level.Side, price_level.Price, price_level.Total())
 }
 
 func (d *Depth) Remove(key *order.OrderKey) {
@@ -82,7 +94,7 @@ func (d *Depth) Remove(key *order.OrderKey) {
 
 	price_level := value.(*PriceLevel)
 	price_level.Remove(key)
-	d.Notification.Publish(price_level.Side, price_level.Price, price_level.Total())
+	d.PublishIncrement(price_level.Side, price_level.Price, price_level.Total())
 
 	if price_level.Empty() || price_level.Total().IsZero() {
 		price_levels.Remove(pl.Key())
@@ -135,14 +147,15 @@ func (d *Depth) SubscribeFetch() {
 
 		ait := d.Asks.Iterator()
 		ait.End()
-		for i := 0; ait.Prev() && i < payload.Limit; i++ {
+		var i int64
+		for i = 0; ait.Prev() && i < payload.Limit; i++ {
 			price_level := ait.Value().(*PriceLevel)
 			depth.Asks = append(depth.Asks, []decimal.Decimal{price_level.Price, price_level.Total()})
 		}
 
 		bit := d.Bids.Iterator()
 		bit.End()
-		for i := 0; bit.Prev() && i < payload.Limit; i++ {
+		for i = 0; bit.Prev() && i < payload.Limit; i++ {
 			price_level := bit.Value().(*PriceLevel)
 			depth.Bids = append(depth.Bids, []decimal.Decimal{price_level.Price, price_level.Total()})
 		}
@@ -156,6 +169,63 @@ func (d *Depth) SubscribeFetch() {
 
 		m.Respond(depth_message)
 	})
+}
+
+func (d *Depth) PublishSnapshot() {
+	d.SnapshotTime = time.Now()
+
+	asks_depth := make([][]decimal.Decimal, 0)
+	bids_depth := make([][]decimal.Decimal, 0)
+
+	i := 0
+	for _, r := range d.Asks.Values() {
+		i++
+		pl := r.(*PriceLevel)
+
+		asks_depth = append(asks_depth, []decimal.Decimal{pl.Price, pl.Total()})
+		if i >= 300 {
+			break
+		}
+	}
+
+	i = 0
+	for _, r := range d.Bids.Values() {
+		i++
+		pl := r.(*PriceLevel)
+
+		bids_depth = append(bids_depth, []decimal.Decimal{pl.Price, pl.Total()})
+		if i >= 300 {
+			break
+		}
+	}
+
+	payload := pkg.DepthJSON{
+		Asks:     asks_depth,
+		Bids:     bids_depth,
+		Sequence: d.Notification.Sequence,
+	}
+
+	payload_message, _ := json.Marshal(payload)
+
+	if err := mq_client.ChanEnqueueEvent(d.Notification.Channel, "public", d.Symbol, "ob-snap", payload_message); err != nil {
+		config.Logger.Errorf("Error: %s", err.Error())
+	}
+}
+
+func (d *Depth) PublishIncrement(side order.OrderSide, price, quantity decimal.Decimal) {
+	if os.Getenv("UI") == "BASEAPP" {
+		if d.IncrementCount < MIN_INCREMENT_COUNT_TO_SNAPSHOT && !d.SnapshotTime.After(time.Now().Add(MAX_PERIOD_TO_SNAPSHOT*-1)) {
+			d.PublishSnapshot()
+			d.IncrementCount = 0
+		} else if d.IncrementCount >= MIN_INCREMENT_COUNT_TO_SNAPSHOT && d.SnapshotTime.Before(time.Now().Add(MIN_PERIOD_TO_SNAPSHOT*-1)) {
+			d.PublishSnapshot()
+			d.IncrementCount = 0
+		}
+
+		d.IncrementCount += 1
+	}
+
+	d.Notification.Publish(side, price, quantity)
 }
 
 func makeComparator(a, b interface{}) int {

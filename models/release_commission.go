@@ -8,12 +8,12 @@ import (
 )
 
 type ReleaseCommission struct {
-	ID          uint64
+	ID          int64
 	AccountType types.AccountType
-	MemberID    uint64
+	MemberID    int64
 	EarnedBTC   decimal.Decimal
-	FriendTrade uint64
-	Friend      uint64
+	FriendTrade int64
+	Friend      int64
 	CreatedAt   time.Time
 	UpdatedAt   time.Time
 }

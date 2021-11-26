@@ -176,7 +176,7 @@ func (p CreateOrderParams) CreateOrder(member *models.Member, err_src *Errors) (
 		return
 	}
 
-	if err := config.DataBase.Create(order).Error; err != nil {
+	if err := config.DataBase.Create(&order).Error; err != nil {
 		err_src.Errors = append(err_src.Errors, "market.order.invalid_volume_or_price")
 
 		return nil

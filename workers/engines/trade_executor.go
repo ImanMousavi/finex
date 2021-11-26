@@ -178,7 +178,7 @@ func (t *TradeExecutor) CreateTradeAndStrikeOrders() (*models.Trade, error) {
 			Table:    clause.Table{Name: "accounts"},
 		}).Where(
 			"member_id IN ? AND currency_id IN ?",
-			[]uint64{
+			[]int64{
 				t.TradePayload.TakerOrder.MemberID,
 				t.TradePayload.MakerOrder.MemberID,
 			},
@@ -189,7 +189,7 @@ func (t *TradeExecutor) CreateTradeAndStrikeOrders() (*models.Trade, error) {
 		).Find(&accounts)
 
 		for _, account := range accounts {
-			accounts_table[account.CurrencyID+":"+strconv.FormatUint(account.MemberID, 10)] = account
+			accounts_table[account.CurrencyID+":"+strconv.FormatInt(account.MemberID, 10)] = account
 		}
 
 		var side types.TakerType
@@ -215,8 +215,8 @@ func (t *TradeExecutor) CreateTradeAndStrikeOrders() (*models.Trade, error) {
 			if err := t.Strike(
 				trade,
 				t.MakerOrder,
-				accounts_table[t.MakerOrder.OutcomeCurrency().ID+":"+strconv.FormatUint(t.MakerOrder.MemberID, 10)],
-				accounts_table[t.MakerOrder.IncomeCurrency().ID+":"+strconv.FormatUint(t.MakerOrder.MemberID, 10)],
+				accounts_table[t.MakerOrder.OutcomeCurrency().ID+":"+strconv.FormatInt(t.MakerOrder.MemberID, 10)],
+				accounts_table[t.MakerOrder.IncomeCurrency().ID+":"+strconv.FormatInt(t.MakerOrder.MemberID, 10)],
 				tx,
 			); err != nil {
 				return err
@@ -227,8 +227,8 @@ func (t *TradeExecutor) CreateTradeAndStrikeOrders() (*models.Trade, error) {
 			if err := t.Strike(
 				trade,
 				t.TakerOrder,
-				accounts_table[t.TakerOrder.OutcomeCurrency().ID+":"+strconv.FormatUint(t.TakerOrder.MemberID, 10)],
-				accounts_table[t.TakerOrder.IncomeCurrency().ID+":"+strconv.FormatUint(t.TakerOrder.MemberID, 10)],
+				accounts_table[t.TakerOrder.OutcomeCurrency().ID+":"+strconv.FormatInt(t.TakerOrder.MemberID, 10)],
+				accounts_table[t.TakerOrder.IncomeCurrency().ID+":"+strconv.FormatInt(t.TakerOrder.MemberID, 10)],
 				tx,
 			); err != nil {
 				return err
@@ -313,7 +313,7 @@ func (t *TradeExecutor) PublishTrade(trade *models.Trade) {
 		}
 	}
 
-	if payload_message, err := json.Marshal(map[string]interface{}{"trades": &[]models.TradeGlobalJSON{trade.TradeGlobalJSON()}}); err == nil {
+	if payload_message, err := json.Marshal(map[string]interface{}{"trades": &[]interface{}{trade.TradeGlobalJSON()}}); err == nil {
 		mq_client.EnqueueEvent("public", trade.MarketID, "trades", payload_message)
 	}
 

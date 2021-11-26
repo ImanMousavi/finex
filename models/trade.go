@@ -2,6 +2,7 @@ package models
 
 import (
 	"encoding/json"
+	"os"
 	"sort"
 	"strings"
 	"time"
@@ -16,15 +17,15 @@ import (
 )
 
 type Trade struct {
-	ID           uint64          `json:"id" gorm:"primaryKey"`
+	ID           int64           `json:"id" gorm:"primaryKey"`
 	Price        decimal.Decimal `json:"price" validate:"ValidatePrice"`
 	Amount       decimal.Decimal `json:"amount" validate:"ValidateAmount"`
 	Total        decimal.Decimal `json:"total" validate:"ValidateTotal"`
-	MakerOrderID uint64          `json:"maker_order_id"`
-	TakerOrderID uint64          `json:"taker_order_id"`
+	MakerOrderID int64           `json:"maker_order_id"`
+	TakerOrderID int64           `json:"taker_order_id"`
 	MarketID     string          `json:"market_id"`
-	MakerID      uint64          `json:"maker_id"`
-	TakerID      uint64          `json:"taker_id"`
+	MakerID      int64           `json:"maker_id"`
+	TakerID      int64           `json:"taker_id"`
 	TakerType    types.TakerType `json:"taker_type"`
 	CreatedAt    time.Time       `json:"created_at"`
 	UpdatedAt    time.Time       `json:"updated_at"`
@@ -122,7 +123,7 @@ func (t *Trade) Side(member *Member) types.TakerType {
 }
 
 func (t *Trade) OrderForMember(member *Member) *Order {
-	if member.ID == uint64(t.MakerID) {
+	if member.ID == int64(t.MakerID) {
 		return t.MakerOrder()
 	} else {
 		return t.TakerOrder()
@@ -388,7 +389,7 @@ func (t *Trade) RecordRevenues(seller_fee, buyer_fee decimal.Decimal, seller_ord
 }
 
 func (t *Trade) OrderFee(order *Order) decimal.Decimal {
-	if uint64(t.MakerOrderID) == order.ID {
+	if int64(t.MakerOrderID) == order.ID {
 		return order.MakerFee
 	} else {
 		return order.TakerFee
@@ -406,7 +407,7 @@ func GetLastTradeFromInflux(market string) *Trade {
 		last_created_at, _ := trades[0]["last_created_at"].(json.Number).Int64()
 
 		return &Trade{
-			ID:        uint64(id),
+			ID:        int64(id),
 			Price:     decimal.NewFromFloat(last_price),
 			Amount:    decimal.NewFromFloat(last_amount),
 			Total:     decimal.NewFromFloat(last_total),
@@ -448,7 +449,7 @@ func (t *Trade) ForUser(member *Member) api_entities.TradeEntity {
 }
 
 type TradeGlobalJSON struct {
-	ID        uint64          `json:"id"`
+	ID        int64           `json:"id"`
 	Market    string          `json:"market"`
 	Price     decimal.Decimal `json:"price"`
 	Amount    decimal.Decimal `json:"amount"`
@@ -457,15 +458,27 @@ type TradeGlobalJSON struct {
 	CreatedAt int64           `json:"created_at"`
 }
 
-func (t *Trade) TradeGlobalJSON() TradeGlobalJSON {
-	return TradeGlobalJSON{
-		ID:        t.ID,
-		Market:    t.MarketID,
-		Price:     t.Price,
-		Amount:    t.Amount,
-		Total:     t.Total,
-		TakerType: t.TakerType,
-		CreatedAt: t.CreatedAt.Unix(),
+func (t *Trade) TradeGlobalJSON() interface{} {
+	if os.Getenv("UI") == "BASEAPP" {
+		return map[string]interface{}{
+			"id":         t.ID,
+			"market":     t.MarketID,
+			"price":      t.Price,
+			"amount":     t.Amount,
+			"total":      t.Total,
+			"taker_type": t.TakerType,
+			"date":       t.CreatedAt.Unix(),
+		}
+	} else {
+		return TradeGlobalJSON{
+			ID:        t.ID,
+			Market:    t.MarketID,
+			Price:     t.Price,
+			Amount:    t.Amount,
+			Total:     t.Total,
+			TakerType: t.TakerType,
+			CreatedAt: t.CreatedAt.Unix(),
+		}
 	}
 }
 

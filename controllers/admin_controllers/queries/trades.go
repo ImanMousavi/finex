@@ -8,7 +8,7 @@ type TradeFilters struct {
 	Market     string          `query:"market"`
 	Type       types.TakerType `query:"type"`
 	MarketType string          `query:"market"`
-	OrderID    uint64          `query:"order_id"`
+	OrderID    int64           `query:"order_id"`
 	UID        string          `query:"uid"`
 	Limit      int             `query:"limit"`
 	Page       int             `query:"page"`

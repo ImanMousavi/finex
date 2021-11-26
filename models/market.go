@@ -7,7 +7,7 @@ import (
 )
 
 type Market struct {
-	ID              uint64          `json:"id" gorm:"primaryKey"`
+	ID              int64           `json:"id" gorm:"primaryKey"`
 	Symbol          string          `json:"symbol"`
 	Type            string          `json:"type"`
 	BaseUnit        string          `json:"base_unit"`

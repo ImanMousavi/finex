@@ -10,7 +10,7 @@ import (
 
 type OrderProcessorPayloadMessage struct {
 	Action pkg.PayloadAction `json:"action"`
-	ID     uint64            `json:"id"`
+	ID     int64             `json:"id"`
 }
 
 type OrderProcessorWorker struct {

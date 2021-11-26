@@ -10,7 +10,7 @@ import (
 )
 
 type TradingFee struct {
-	ID         uint64 `gorm:"primaryKey"`
+	ID         int64 `gorm:"primaryKey"`
 	MarketID   string
 	Group      string
 	Maker      decimal.Decimal
@@ -43,6 +43,10 @@ func TradingFeeFor(group string, market_type types.AccountType, market_id string
 		if trading_fee == nil || trading_fee.Weight() < tf.Weight() {
 			trading_fee = tf
 		}
+	}
+
+	if trading_fee == nil {
+		trading_fee = &TradingFee{}
 	}
 
 	return trading_fee

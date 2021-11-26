@@ -26,7 +26,7 @@ func BenchmarkInsertOrder(b *testing.B) {
 		quantity := rand.Intn(10) + 1
 
 		orders[n] = &order.Order{
-			ID:        uint64(n),
+			ID:        int64(n),
 			Side:      side,
 			Price:     decimal.NewFromFloat(float64(price)),
 			Quantity:  decimal.NewFromFloat(float64(quantity)),

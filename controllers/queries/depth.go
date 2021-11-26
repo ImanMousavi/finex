@@ -3,7 +3,7 @@ package queries
 import "github.com/zsmartex/finex/controllers/helpers"
 
 type DepthQuery struct {
-	Limit int `query:"limit" validate:"uint"`
+	Limit int64 `query:"limit" validate:"uint"`
 }
 
 func (t DepthQuery) Messages() map[string]string {

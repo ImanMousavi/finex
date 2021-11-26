@@ -8,13 +8,13 @@ import (
 )
 
 type Commission struct {
-	ID              uint64
+	ID              int64
 	AccountType     types.AccountType
-	MemberID        uint64
+	MemberID        int64
 	FriendUID       string
 	EarnAmount      decimal.Decimal
 	CurrencyID      string
-	ParentID        uint64
+	ParentID        int64
 	ParentCreatedAt time.Time
 	CreatedAt       time.Time
 	UpdatedAt       time.Time

@@ -11,6 +11,6 @@ func Lock() (tx *gorm.DB) {
 }
 
 type Reference struct {
-	ID   uint64
+	ID   int64
 	Type string
 }

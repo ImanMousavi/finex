@@ -8,7 +8,7 @@ import (
 )
 
 type Member struct {
-	ID          uint64         `json:"id" gorm:"primaryKey"`
+	ID          int64          `json:"id" gorm:"primaryKey"`
 	UID         string         `json:"uid"`
 	Email       string         `json:"email"`
 	Level       int32          `json:"level" gorm:"default:0" validate:"min:0"`

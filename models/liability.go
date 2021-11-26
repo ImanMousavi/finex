@@ -8,12 +8,12 @@ import (
 )
 
 type Liability struct {
-	ID            uint64          `json:"id"`
+	ID            int64           `json:"id"`
 	Code          int32           `json:"code"`
 	CurrencyID    string          `json:"currency_id"`
-	MemberID      uint64          `json:"member_id"`
+	MemberID      int64           `json:"member_id"`
 	ReferenceType string          `json:"reference_type"`
-	ReferenceID   uint64          `json:"reference_id"`
+	ReferenceID   int64           `json:"reference_id"`
 	Debit         decimal.Decimal `json:"debit"`
 	Credit        decimal.Decimal `json:"credit"`
 	CreatedAt     time.Time       `json:"created_at"`
@@ -27,7 +27,7 @@ func GetOperationsCode(currency *Currency, kind string) int32 {
 	return operations_account.Code
 }
 
-func LiabilityCredit(amount decimal.Decimal, currency *Currency, reference Reference, kind string, member_id uint64) {
+func LiabilityCredit(amount decimal.Decimal, currency *Currency, reference Reference, kind string, member_id int64) {
 	code := GetOperationsCode(currency, kind)
 
 	liability := Liability{
@@ -42,7 +42,7 @@ func LiabilityCredit(amount decimal.Decimal, currency *Currency, reference Refer
 	config.DataBase.Create(&liability)
 }
 
-func LiabilityDebit(amount decimal.Decimal, currency *Currency, reference Reference, kind string, member_id uint64) {
+func LiabilityDebit(amount decimal.Decimal, currency *Currency, reference Reference, kind string, member_id int64) {
 	code := GetOperationsCode(currency, kind)
 
 	liability := Liability{
@@ -57,7 +57,7 @@ func LiabilityDebit(amount decimal.Decimal, currency *Currency, reference Refere
 	config.DataBase.Create(&liability)
 }
 
-func LiabilityTranfer(amount decimal.Decimal, currency *Currency, reference Reference, from_kind, to_kind string, member_id uint64) {
+func LiabilityTranfer(amount decimal.Decimal, currency *Currency, reference Reference, from_kind, to_kind string, member_id int64) {
 	LiabilityCredit(amount, currency, reference, from_kind, member_id)
 	LiabilityDebit(amount, currency, reference, to_kind, member_id)
 }

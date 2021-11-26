@@ -20,7 +20,7 @@ type OrderEntity struct {
 	OriginVolume    decimal.Decimal     `json:"origin_volume"`
 	RemainingVolume decimal.Decimal     `json:"remaining_volume"`
 	ExecutedVolume  decimal.Decimal     `json:"executed_volume"`
-	TradesCount     uint64              `json:"trades_count"`
+	TradesCount     int64               `json:"trades_count"`
 	CreatedAt       time.Time           `json:"created_at"`
 	UpdatedAt       time.Time           `json:"updated_at"`
 }

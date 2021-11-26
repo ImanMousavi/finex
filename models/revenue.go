@@ -8,12 +8,12 @@ import (
 )
 
 type Revenue struct {
-	ID            uint64          `json:"id"`
+	ID            int64           `json:"id"`
 	Code          int32           `json:"code"`
 	CurrencyID    string          `json:"currency_id"`
-	MemberID      uint64          `json:"member_id"`
+	MemberID      int64           `json:"member_id"`
 	ReferenceType string          `json:"reference_type"`
-	ReferenceID   uint64          `json:"reference_id"`
+	ReferenceID   int64           `json:"reference_id"`
 	Debit         decimal.Decimal `json:"debit"`
 	Credit        decimal.Decimal `json:"credit"`
 	CreatedAt     time.Time       `json:"created_at"`
@@ -27,7 +27,7 @@ func GetRevenueCode(currency *Currency) int32 {
 	return operations_account.Code
 }
 
-func RevenueCredit(amount decimal.Decimal, currency *Currency, reference Reference, member_id uint64) {
+func RevenueCredit(amount decimal.Decimal, currency *Currency, reference Reference, member_id int64) {
 	code := GetRevenueCode(currency)
 
 	revenue := Revenue{
@@ -42,7 +42,7 @@ func RevenueCredit(amount decimal.Decimal, currency *Currency, reference Referen
 	config.DataBase.Create(&revenue)
 }
 
-func RevenueDebit(amount decimal.Decimal, currency *Currency, reference Reference, member_id uint64) {
+func RevenueDebit(amount decimal.Decimal, currency *Currency, reference Reference, member_id int64) {
 	code := GetRevenueCode(currency)
 
 	revenue := Revenue{
@@ -57,7 +57,7 @@ func RevenueDebit(amount decimal.Decimal, currency *Currency, reference Referenc
 	config.DataBase.Create(&revenue)
 }
 
-func RevenueTranfer(amount decimal.Decimal, currency *Currency, reference Reference, from_kind, to_kind string, member_id uint64) {
+func RevenueTranfer(amount decimal.Decimal, currency *Currency, reference Reference, from_kind, to_kind string, member_id int64) {
 	RevenueCredit(amount, currency, reference, member_id)
 	RevenueDebit(amount, currency, reference, member_id)
 }
