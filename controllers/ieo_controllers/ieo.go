@@ -120,7 +120,9 @@ func CreateIEOOrder(c *fiber.Ctx) error {
 	member_balance := ieo_order.MemberBalance()
 
 	if member_balance.LessThan(ieo_order.Total()) {
-		return errors.New("market.account.insufficient_balance")
+		return c.Status(422).JSON(helpers.Errors{
+			Errors: []string{"market.account.insufficient_balance"},
+		})
 	}
 
 	config.DataBase.Create(&ieo_order)
