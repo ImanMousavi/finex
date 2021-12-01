@@ -31,6 +31,7 @@ func IEOToEntity(ieo *models.IEO) *entities.IEO {
 		Ended:               ieo.IsEnded(),
 		BannerUrl:           ieo.BannerUrl,
 		Data:                ieo.Data,
+		Distributors:        ieo.Distributors(),
 		CreatedAt:           ieo.CreatedAt,
 		UpdatedAt:           ieo.UpdatedAt,
 	}

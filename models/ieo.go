@@ -30,6 +30,14 @@ func (IEO) TableName() string {
 	return "ieos"
 }
 
+func (m *IEO) Distributors() int64 {
+	var result int64 = 0
+
+	config.DataBase.Table("ieo_orders").Where("ieo_id = ?", m.ID).Group("member_id").Count(&result)
+
+	return result
+}
+
 func (m *IEO) IsEnabled() bool {
 	return m.State == "enabled"
 }

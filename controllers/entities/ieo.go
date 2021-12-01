@@ -22,6 +22,7 @@ type IEO struct {
 	BoughtQuantity      decimal.Decimal `json:"bought_quantity,omitempty"`
 	BannerUrl           string          `json:"banner_url"`
 	Data                string          `json:"data"`
+	Distributors        int64           `json:"distributors"`
 	CreatedAt           time.Time       `json:"created_at"`
 	UpdatedAt           time.Time       `json:"updated_at"`
 }
