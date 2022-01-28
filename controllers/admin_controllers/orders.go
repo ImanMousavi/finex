@@ -39,7 +39,7 @@ func CancelOrder(c *fiber.Ctx) error {
 		"action": pkg.ActionCancel,
 		"order":  order.ToMatchingAttributes(),
 	})
-	config.Nats.Publish("matching", payload_matching_attrs)
+	config.Kafka.Publish("matching", payload_matching_attrs)
 
 	return c.Status(200).JSON(order.ToJSON())
 }
@@ -84,7 +84,7 @@ func CancelAllOrders(c *fiber.Ctx) error {
 			"action": pkg.ActionCancel,
 			"order":  order.ToMatchingAttributes(),
 		})
-		config.Nats.Publish("matching", payload_matching_attrs)
+		config.Kafka.Publish("matching", payload_matching_attrs)
 	}
 
 	var ordersJSON []entities.OrderEntity

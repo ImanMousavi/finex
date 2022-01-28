@@ -3,24 +3,32 @@ package config
 import (
 	"io/ioutil"
 
+	"github.com/sirupsen/logrus"
 	"github.com/zsmartex/finex/types"
+	"github.com/zsmartex/pkg/services"
 	"gopkg.in/yaml.v2"
+	"gorm.io/gorm"
 )
 
+var DataBase *gorm.DB
+var Logger *logrus.Entry
+var Kafka *services.KafkaClient
 var Referral *types.Referral
 
 func InitializeConfig() error {
-	NewLoggerService()
-	if err := ConnectDatabase(); err != nil {
+	Logger = services.NewLoggerService("Finex")
+	db, err := services.NewDatabase()
+	if err != nil {
 		return err
 	}
+
+	DataBase = db
+	Kafka = services.NewKafka()
+
 	if err := NewCacheService(); err != nil {
 		return err
 	}
 	if err := NewInfluxDB(); err != nil {
-		return err
-	}
-	if err := ConnectNats(); err != nil {
 		return err
 	}
 

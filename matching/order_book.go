@@ -2,13 +2,21 @@ package matching
 
 import (
 	"encoding/json"
+	"os"
+	"strconv"
 	"sync"
 
 	"github.com/emirpasic/gods/trees/redblacktree"
-	"github.com/nats-io/nats.go"
 	"github.com/shopspring/decimal"
+	"google.golang.org/protobuf/types/known/timestamppb"
+
 	"github.com/zsmartex/finex/config"
 	"github.com/zsmartex/pkg"
+	GrpcEngine "github.com/zsmartex/pkg/Grpc/engine"
+	GrpcOrder "github.com/zsmartex/pkg/Grpc/order"
+	GrpcQuantex "github.com/zsmartex/pkg/Grpc/quantex"
+	GrpcUtils "github.com/zsmartex/pkg/Grpc/utils"
+	clientQuantex "github.com/zsmartex/pkg/client/quantex"
 	"github.com/zsmartex/pkg/order"
 	"github.com/zsmartex/pkg/trade"
 )
@@ -22,6 +30,7 @@ type OrderBook struct {
 	StopBids           *redblacktree.Tree
 	StopAsks           *redblacktree.Tree
 	pendingOrdersQueue *OrderQueue
+	quantexClient      *clientQuantex.GrpcQuantexClient
 }
 
 const (
@@ -68,6 +77,13 @@ func StopComparator(a, b interface{}) (result int) {
 }
 
 func NewOrderBook(symbol string, market_price decimal.Decimal) *OrderBook {
+	var quantex_client *clientQuantex.GrpcQuantexClient
+	quantexEnabled, _ := strconv.ParseBool(os.Getenv("QUANTEX_ENABLED"))
+
+	if quantexEnabled {
+		quantex_client = clientQuantex.NewQuantexClient()
+	}
+
 	ob := &OrderBook{
 		Symbol:             symbol,
 		MarketPrice:        market_price,
@@ -75,103 +91,93 @@ func NewOrderBook(symbol string, market_price decimal.Decimal) *OrderBook {
 		StopBids:           redblacktree.NewWith(StopComparator),
 		StopAsks:           redblacktree.NewWith(StopComparator),
 		pendingOrdersQueue: NewOrderQueue(pendingOrdersCap),
+		quantexClient:      quantex_client,
 	}
-
-	ob.SubscribeCalcMarketOrder()
 
 	return ob
 }
 
-type CalculateMarketOrder struct {
-	Side     order.OrderSide     `json:"side"`
-	Quantity decimal.NullDecimal `json:"quantity"`
-	Volume   decimal.NullDecimal `json:"volume"`
-}
+func (ob *OrderBook) GetOrder()
 
-type CalculateMarketOrderResult struct {
-	Quantity decimal.Decimal `json:"quantity"`
-	Locked   decimal.Decimal `json:"locked"`
-}
+func (ob *OrderBook) CalcMarketOrder(side order.OrderSide, quantity decimal.NullDecimal, volume decimal.NullDecimal) *GrpcEngine.CalcMarketOrderResponse {
+	zero := decimal.Zero
 
-func (ob *OrderBook) SubscribeCalcMarketOrder() {
-	config.Nats.Subscribe("finex:calc_market_order:"+ob.Symbol, func(m *nats.Msg) {
-		ob.orderMutex.Lock()
-		defer ob.orderMutex.Unlock()
+	var book *redblacktree.Tree
+	if side == order.SideSell {
+		book = ob.Depth.Bids
+	} else {
+		book = ob.Depth.Asks
+	}
 
-		var calc_market_order_payload *CalculateMarketOrder
-		json.Unmarshal(m.Data, &calc_market_order_payload)
+	var expected decimal.Decimal
+	required := decimal.Zero
+	if quantity.Valid {
+		expected = quantity.Decimal
+	} else {
+		expected = volume.Decimal
+	}
 
-		side := calc_market_order_payload.Side
-		quantity := calc_market_order_payload.Quantity
-		volume := calc_market_order_payload.Volume
-
-		var book *redblacktree.Tree
-		if side == order.SideSell {
-			book = ob.Depth.Bids
-		} else {
-			book = ob.Depth.Asks
+	if expected.IsZero() {
+		return &GrpcEngine.CalcMarketOrderResponse{
+			Quantity: &GrpcUtils.Decimal{
+				Val: zero.CoefficientInt64(),
+				Exp: zero.Exponent(),
+			},
+			Locked: &GrpcUtils.Decimal{
+				Val: zero.CoefficientInt64(),
+				Exp: zero.Exponent(),
+			},
 		}
+	}
 
-		var expected decimal.Decimal
-		required := decimal.Zero
+	order_quantity := decimal.Zero
+	it := book.Iterator()
+	for it.Next() && expected.IsPositive() {
+		pl := it.Value().(*PriceLevel)
+
 		if quantity.Valid {
-			expected = quantity.Decimal
-		} else {
-			expected = volume.Decimal
-		}
+			v := decimal.Min(pl.Total(), expected)
+			order_quantity = order_quantity.Add(v)
+			expected = expected.Sub(v)
 
-		if expected.IsZero() {
-			payload, _ := json.Marshal(CalculateMarketOrderResult{
-				Quantity: decimal.Zero,
-				Locked:   decimal.Zero,
-			})
-
-			m.Respond(payload)
-			return
-		}
-
-		order_quantity := decimal.Zero
-		it := book.Iterator()
-		for it.Next() && expected.IsPositive() {
-			pl := it.Value().(*PriceLevel)
-
-			if quantity.Valid {
-				v := decimal.Min(pl.Total(), expected)
-				order_quantity = order_quantity.Add(v)
-				expected = expected.Sub(v)
-
-				if pl.Side == order.SideSell {
-					required = required.Add(pl.Price.Mul(v))
-				} else {
-					required = required.Add(v)
-				}
+			if pl.Side == order.SideSell {
+				required = required.Add(pl.Price.Mul(v))
 			} else {
-				// Not ready now
-				v := decimal.Min(pl.Price.Mul(pl.Total()), expected)
-
 				required = required.Add(v)
-				expected = expected.Sub(v)
-				order_quantity = order_quantity.Add(v.Div(pl.Price))
 			}
+		} else {
+			// Not ready now
+			v := decimal.Min(pl.Price.Mul(pl.Total()), expected)
+
+			required = required.Add(v)
+			expected = expected.Sub(v)
+			order_quantity = order_quantity.Add(v.Div(pl.Price))
 		}
+	}
 
-		if !expected.IsZero() {
-			payload, _ := json.Marshal(CalculateMarketOrderResult{
-				Quantity: decimal.Zero,
-				Locked:   decimal.Zero,
-			})
-
-			m.Respond(payload)
-			return
+	if !expected.IsZero() {
+		return &GrpcEngine.CalcMarketOrderResponse{
+			Quantity: &GrpcUtils.Decimal{
+				Val: zero.CoefficientInt64(),
+				Exp: zero.Exponent(),
+			},
+			Locked: &GrpcUtils.Decimal{
+				Val: zero.CoefficientInt64(),
+				Exp: zero.Exponent(),
+			},
 		}
+	}
 
-		payload, _ := json.Marshal(CalculateMarketOrderResult{
-			Quantity: order_quantity,
-			Locked:   required,
-		})
-
-		m.Respond(payload)
-	})
+	return &GrpcEngine.CalcMarketOrderResponse{
+		Quantity: &GrpcUtils.Decimal{
+			Val: order_quantity.CoefficientInt64(),
+			Exp: order_quantity.Exponent(),
+		},
+		Locked: &GrpcUtils.Decimal{
+			Val: required.CoefficientInt64(),
+			Exp: required.Exponent(),
+		},
+	}
 }
 
 func (ob *OrderBook) setMarketPrice(newPrice decimal.Decimal) {
@@ -286,7 +292,7 @@ func (ob *OrderBook) PublishCancel(key *order.OrderKey) error {
 		return err
 	}
 
-	return config.Nats.Publish("order_processor", order_processor_message)
+	return config.Kafka.Publish("order_processor", order_processor_message)
 }
 
 func (ob *OrderBook) Match(maker *order.Order) {
@@ -341,13 +347,39 @@ func (ob *OrderBook) Match(maker *order.Order) {
 		ob.setMarketPrice(taker.Price)
 
 		if taker.IsFake() {
-			if order_message, err := json.Marshal(taker); err == nil {
-				config.Nats.Publish("quantex:update:order", order_message)
-			}
+			ob.quantexClient.UpdateOrder(&GrpcQuantex.UpdateOrderRequest{
+				Order: &GrpcOrder.Order{
+					Id:       taker.ID,
+					Uuid:     taker.UUID[:],
+					MemberId: taker.MemberID,
+					Symbol:   taker.Symbol,
+					Side:     string(taker.Side),
+					Type:     string(taker.Type),
+					Price: &GrpcUtils.Decimal{
+						Val: taker.Price.CoefficientInt64(),
+						Exp: taker.Price.Exponent(),
+					},
+					StopPrice: &GrpcUtils.Decimal{
+						Val: taker.StopPrice.CoefficientInt64(),
+						Exp: taker.StopPrice.Exponent(),
+					},
+					Quantity: &GrpcUtils.Decimal{
+						Val: taker.Quantity.CoefficientInt64(),
+						Exp: taker.Quantity.Exponent(),
+					},
+					FilledQuantity: &GrpcUtils.Decimal{
+						Val: taker.FilledQuantity.CoefficientInt64(),
+						Exp: taker.FilledQuantity.Exponent(),
+					},
+					Fake:      taker.Fake,
+					Cancelled: taker.Cancelled,
+					CreatedAt: timestamppb.New(taker.CreatedAt),
+				},
+			})
 		}
 
 		trade_message, _ := json.Marshal(trade)
-		config.Nats.Publish("trade_executor", trade_message)
+		config.Kafka.Publish("trade_executor", trade_message)
 
 		if maker.Filled() {
 			return
@@ -357,9 +389,35 @@ func (ob *OrderBook) Match(maker *order.Order) {
 	if maker.UnfilledQuantity().IsPositive() && maker.Type == order.TypeLimit {
 		ob.Depth.Add(maker)
 		if maker.IsFake() {
-			if order_message, err := json.Marshal(maker); err == nil {
-				config.Nats.Publish("quantex:update:order", order_message)
-			}
+			ob.quantexClient.UpdateOrder(&GrpcQuantex.UpdateOrderRequest{
+				Order: &GrpcOrder.Order{
+					Id:       maker.ID,
+					Uuid:     maker.UUID[:],
+					MemberId: maker.MemberID,
+					Symbol:   maker.Symbol,
+					Side:     string(maker.Side),
+					Type:     string(maker.Type),
+					Price: &GrpcUtils.Decimal{
+						Val: maker.Price.CoefficientInt64(),
+						Exp: maker.Price.Exponent(),
+					},
+					StopPrice: &GrpcUtils.Decimal{
+						Val: maker.StopPrice.CoefficientInt64(),
+						Exp: maker.StopPrice.Exponent(),
+					},
+					Quantity: &GrpcUtils.Decimal{
+						Val: maker.Quantity.CoefficientInt64(),
+						Exp: maker.Quantity.Exponent(),
+					},
+					FilledQuantity: &GrpcUtils.Decimal{
+						Val: maker.FilledQuantity.CoefficientInt64(),
+						Exp: maker.FilledQuantity.Exponent(),
+					},
+					Fake:      maker.Fake,
+					Cancelled: maker.Cancelled,
+					CreatedAt: timestamppb.New(maker.CreatedAt),
+				},
+			})
 		}
 	}
 }

@@ -231,7 +231,7 @@ func SubmitOrder(id int64) error {
 			"action": pkg.ActionSubmit,
 			"order":  order.ToMatchingAttributes(),
 		})
-		config.Nats.Publish("matching", payload_matching_attrs)
+		config.Kafka.Publish("matching", payload_matching_attrs)
 
 		return nil
 	})
@@ -297,7 +297,7 @@ func (o *Order) Submit() error {
 		"id":     o.ID,
 	})
 
-	config.Nats.Publish("order_processor", order_processor_payload)
+	config.Kafka.Publish("order_processor", order_processor_payload)
 	return nil
 }
 

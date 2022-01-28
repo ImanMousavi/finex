@@ -1,17 +1,17 @@
 package helpers
 
 import (
-	"encoding/json"
-	"time"
-
 	"github.com/gookit/validate"
 	"github.com/shopspring/decimal"
 
+	GrpcEngine "github.com/zsmartex/pkg/Grpc/engine"
+	GrpcUtils "github.com/zsmartex/pkg/Grpc/utils"
+	clientEngine "github.com/zsmartex/pkg/client/engine"
+	"github.com/zsmartex/pkg/order"
+
 	"github.com/zsmartex/finex/config"
-	"github.com/zsmartex/finex/matching"
 	"github.com/zsmartex/finex/models"
 	"github.com/zsmartex/finex/types"
-	"github.com/zsmartex/pkg/order"
 )
 
 type CreateOrderParams struct {
@@ -109,29 +109,33 @@ func (p CreateOrderParams) BuildOrder(member *models.Member, err_src *Errors) *m
 			side = order.SideSell
 		}
 
-		payload, _ := json.Marshal(matching.CalculateMarketOrder{
-			Side:     side,
-			Quantity: p.Quantity,
-			// Volume:   p.Volume,
-		})
+		matching_client := clientEngine.NewMatchingClient()
+		defer matching_client.Close()
 
-		msg, err := config.Nats.Request("finex:calc_market_order:"+market.Symbol, payload, 5*time.Second)
+		calc_market_order_response, err := matching_client.CalcMarketOrder(&GrpcEngine.CalcMarketOrderRequest{
+			Symbol: market.Symbol,
+			Side:   string(side),
+			Quantity: &GrpcUtils.Decimal{
+				Val: p.Quantity.Decimal.CoefficientInt64(),
+				Exp: p.Quantity.Decimal.Exponent(),
+			},
+			// Volume: &engineGrpc.Decimal{
+			// 	Val: p.Volume.Decimal.CoefficientInt64(),
+			// 	Exp: p.Volume.Decimal.Exponent(),
+			// },
+		})
 		if err != nil {
 			err_src.Errors = append(err_src.Errors, "market.order.insufficient_market_liquidity")
 
 			return nil
 		}
 
-		var result matching.CalculateMarketOrderResult
+		quantity = calc_market_order_response.Quantity.ToDecimal()
+		locked = calc_market_order_response.Locked.ToDecimal()
 
-		json.Unmarshal(msg.Data, &result)
-
-		if result.Quantity.IsZero() || result.Locked.IsZero() {
+		if quantity.IsZero() || locked.IsZero() {
 			err_src.Errors = append(err_src.Errors, "market.order.insufficient_market_liquidity")
 		}
-
-		quantity = result.Quantity
-		locked = result.Locked
 	} else {
 		quantity = p.Quantity.Decimal
 		if p.Side == types.SideBuy {

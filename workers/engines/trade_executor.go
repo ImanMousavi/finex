@@ -73,7 +73,7 @@ func (w *TradeExecutorWorker) Process(payload []byte) error {
 				continue
 			}
 
-			config.Nats.Publish("matching", matching_payload_message)
+			config.Kafka.Publish("matching", matching_payload_message)
 		}
 		return err
 	}

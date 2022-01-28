@@ -7,12 +7,13 @@ import (
 	"time"
 
 	"github.com/emirpasic/gods/trees/redblacktree"
-	"github.com/nats-io/nats.go"
 	"github.com/shopspring/decimal"
 
 	"github.com/zsmartex/finex/config"
 	"github.com/zsmartex/finex/mq_client"
 	"github.com/zsmartex/pkg"
+	GrpcEngine "github.com/zsmartex/pkg/Grpc/engine"
+	GrpcUtils "github.com/zsmartex/pkg/Grpc/utils"
 	"github.com/zsmartex/pkg/order"
 )
 
@@ -21,8 +22,7 @@ var MAX_PERIOD_TO_SNAPSHOT = 60 * time.Second
 var MIN_INCREMENT_COUNT_TO_SNAPSHOT int64 = 20
 
 type Depth struct {
-	depthMutex       sync.Mutex
-	fetchOrdersMutex sync.Mutex
+	depthMutex sync.RWMutex
 
 	Symbol       string
 	Asks         *redblacktree.Tree
@@ -42,8 +42,6 @@ func NewDepth(symbol string) *Depth {
 		Bids:         redblacktree.NewWith(makeComparator),
 		Notification: NewNotification(symbol),
 	}
-
-	depth.SubscribeFetch()
 
 	return depth
 }
@@ -101,74 +99,61 @@ func (d *Depth) Remove(key *order.OrderKey) {
 	}
 }
 
-func (d *Depth) SubscribeFetch() {
-	config.Nats.Subscribe("finex:order:"+d.Symbol, func(m *nats.Msg) {
-		d.fetchOrdersMutex.Lock()
-		d.depthMutex.Lock()
-		defer d.fetchOrdersMutex.Unlock()
-		defer d.depthMutex.Unlock()
+func (d *Depth) FetchOrderBook(limit int64) *GrpcEngine.FetchOrderBookResponse {
+	d.depthMutex.Lock()
+	defer d.depthMutex.Unlock()
 
-		var key *order.OrderKey
-		json.Unmarshal(m.Data, &key)
+	result := &GrpcEngine.FetchOrderBookResponse{
+		Symbol:   d.Symbol,
+		Asks:     make([]*GrpcEngine.BookOrder, 0),
+		Bids:     make([]*GrpcEngine.BookOrder, 0),
+		Sequence: d.Notification.Sequence,
+	}
 
-		var price_levels *redblacktree.Tree
-		if key.Side == order.SideSell {
-			price_levels = d.Asks
-		} else {
-			price_levels = d.Bids
-		}
-		pl := NewPriceLevel(key.Side, key.Price)
-		value, found := price_levels.Get(pl.Key())
-		if !found {
-			order_message, _ := json.Marshal(nil)
-			m.Respond(order_message)
-			return
-		}
+	ait := d.Asks.Iterator()
+	ait.End()
+	var i int64
+	for i = 0; ait.Prev() && i < limit; i++ {
+		price_level := ait.Value().(*PriceLevel)
+		price := price_level.Price
+		quantity := price_level.Total()
 
-		price_level := value.(*PriceLevel)
-		order := price_level.Get(key)
+		result.Asks = append(result.Asks, &GrpcEngine.BookOrder{
+			PriceQuantity: []*GrpcUtils.Decimal{
+				{
+					Val: price.CoefficientInt64(),
+					Exp: price.Exponent(),
+				},
+				{
+					Val: quantity.CoefficientInt64(),
+					Exp: quantity.Exponent(),
+				},
+			},
+		})
+	}
 
-		order_message, _ := json.Marshal(order)
-		m.Respond(order_message)
-	})
+	bit := d.Bids.Iterator()
+	bit.End()
+	for i = 0; bit.Prev() && i < limit; i++ {
+		price_level := bit.Value().(*PriceLevel)
+		price := price_level.Price
+		quantity := price_level.Total()
 
-	config.Nats.Subscribe("finex:depth:"+d.Symbol, func(m *nats.Msg) {
-		d.depthMutex.Lock()
-		defer d.depthMutex.Unlock()
+		result.Bids = append(result.Bids, &GrpcEngine.BookOrder{
+			PriceQuantity: []*GrpcUtils.Decimal{
+				{
+					Val: price.CoefficientInt64(),
+					Exp: price.Exponent(),
+				},
+				{
+					Val: quantity.CoefficientInt64(),
+					Exp: quantity.Exponent(),
+				},
+			},
+		})
+	}
 
-		var payload pkg.GetDepthPayload
-		json.Unmarshal(m.Data, &payload)
-
-		depth := pkg.DepthJSON{
-			Asks:     make([][]decimal.Decimal, 0),
-			Bids:     make([][]decimal.Decimal, 0),
-			Sequence: 0,
-		}
-
-		ait := d.Asks.Iterator()
-		ait.End()
-		var i int64
-		for i = 0; ait.Prev() && i < payload.Limit; i++ {
-			price_level := ait.Value().(*PriceLevel)
-			depth.Asks = append(depth.Asks, []decimal.Decimal{price_level.Price, price_level.Total()})
-		}
-
-		bit := d.Bids.Iterator()
-		bit.End()
-		for i = 0; bit.Prev() && i < payload.Limit; i++ {
-			price_level := bit.Value().(*PriceLevel)
-			depth.Bids = append(depth.Bids, []decimal.Decimal{price_level.Price, price_level.Total()})
-		}
-		depth.Sequence = d.Notification.Sequence
-
-		depth_message, err := json.Marshal(depth)
-
-		if err != nil {
-			config.Logger.Errorf("Error: %s", err.Error())
-		}
-
-		m.Respond(depth_message)
-	})
+	return result
 }
 
 func (d *Depth) PublishSnapshot() {

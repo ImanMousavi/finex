@@ -92,7 +92,7 @@ func SubmitIEOOrder(id int64) error {
 		tx.Save(&order)
 
 		payload_ieo_order_executor_attrs, _ := json.Marshal(order.ToJSON())
-		config.Nats.Publish("ieo_order_executor", payload_ieo_order_executor_attrs)
+		config.Kafka.Publish("ieo_order_executor", payload_ieo_order_executor_attrs)
 
 		return nil
 	})

@@ -33,7 +33,7 @@ func (IEO) TableName() string {
 func (m *IEO) Distributors() int64 {
 	var result int64 = 0
 
-	config.DataBase.Table("ieo_orders").Where("ieo_id = ?", m.ID).Group("member_id").Count(&result)
+	config.DataBase.Raw("SELECT count(*) FROM (SELECT member_id FROM ieo_orders GROUP BY member_id, ieo_id HAVING ieo_id = ?) as sub", m.ID).Scan(&result)
 
 	return result
 }

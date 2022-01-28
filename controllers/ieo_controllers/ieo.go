@@ -128,7 +128,7 @@ func CreateIEOOrder(c *fiber.Ctx) error {
 	config.DataBase.Create(&ieo_order)
 
 	payload_ieo_order_processor_attrs, _ := json.Marshal(ieo_order.ToJSON())
-	config.Nats.Publish("ieo_order_processor", payload_ieo_order_processor_attrs)
+	config.Kafka.Publish("ieo_order_processor", payload_ieo_order_processor_attrs)
 
 	return c.Status(201).JSON(ieo_order.ToJSON())
 }

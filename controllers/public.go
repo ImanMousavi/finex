@@ -1,18 +1,21 @@
 package controllers
 
 import (
-	"encoding/json"
 	"time"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/shopspring/decimal"
+
+	"github.com/zsmartex/pkg"
+	clientEngine "github.com/zsmartex/pkg/client/engine"
+
 	"github.com/zsmartex/finex/config"
 	"github.com/zsmartex/finex/controllers/entities"
 	"github.com/zsmartex/finex/controllers/helpers"
 	"github.com/zsmartex/finex/controllers/queries"
 	"github.com/zsmartex/finex/models"
 	"github.com/zsmartex/finex/types"
-	"github.com/zsmartex/pkg"
+	engineGrpc "github.com/zsmartex/pkg/Grpc/engine"
 )
 
 func IEOToEntity(ieo *models.IEO) *entities.IEO {
@@ -93,6 +96,9 @@ func GetDepth(c *fiber.Ctx) error {
 		return c.Status(422).JSON(errors)
 	}
 
+	matching_client := clientEngine.NewMatchingClient()
+	defer matching_client.Close()
+
 	if params.Limit == 0 {
 		params.Limit = 100
 	}
@@ -103,18 +109,29 @@ func GetDepth(c *fiber.Ctx) error {
 		Sequence: 0,
 	}
 
-	var err error
-	payload, _ := json.Marshal(pkg.GetDepthPayload{
-		Market: market,
+	fetch_orderbook_response, err := matching_client.FetchOrderBook(&engineGrpc.FetchOrderBookRequest{
+		Symbol: market,
 		Limit:  params.Limit,
 	})
-	msg, err := config.Nats.Request("finex:depth:"+market, payload, 5*time.Second)
-
 	if err != nil {
 		return c.Status(200).JSON(depth)
 	}
 
-	json.Unmarshal(msg.Data, &depth)
+	for _, bookOrder := range fetch_orderbook_response.Asks {
+		price := bookOrder.PriceQuantity[0].ToDecimal()
+		amount := bookOrder.PriceQuantity[1].ToDecimal()
+
+		depth.Asks = append(depth.Asks, []decimal.Decimal{price, amount})
+	}
+
+	for _, bookOrder := range fetch_orderbook_response.Bids {
+		price := bookOrder.PriceQuantity[0].ToDecimal()
+		amount := bookOrder.PriceQuantity[1].ToDecimal()
+
+		depth.Bids = append(depth.Bids, []decimal.Decimal{price, amount})
+	}
+
+	depth.Sequence = fetch_orderbook_response.Sequence
 
 	return c.Status(200).JSON(depth)
 }

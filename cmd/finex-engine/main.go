@@ -3,7 +3,8 @@ package main
 import (
 	"fmt"
 	"os"
-	"time"
+
+	"github.com/confluentinc/confluent-kafka-go/kafka"
 
 	"github.com/zsmartex/finex/config"
 	"github.com/zsmartex/finex/mq_client"
@@ -12,8 +13,6 @@ import (
 
 func CreateWorker(id string) engines.Worker {
 	switch id {
-	case "matching":
-		return engines.NewMatchingWorker()
 	case "order_processor":
 		return engines.NewOrderProcessorWorker()
 	case "trade_executor":
@@ -40,28 +39,16 @@ func main() {
 		fmt.Println("Start finex-engine: " + id)
 		worker := CreateWorker(id)
 
-		prefetch := mq_client.GetPrefetchCount(id)
+		config.Kafka.Subscribe(id, func(c *kafka.Consumer, e kafka.Event) error {
+			config.Logger.Infof("Receive message: %s", e.String())
 
-		if prefetch > 0 {
-			mq_client.GetChannel().Qos(prefetch, 0, false)
-		}
-
-		sub, _ := config.Nats.QueueSubscribeSync(id, id)
-
-		for {
-			m, err := sub.NextMsg(1 * time.Second)
+			err := worker.Process([]byte(e.String()))
 
 			if err != nil {
-				continue
-			}
-
-			config.Logger.Infof("Receive message: %s", string(m.Data))
-			if err := worker.Process(m.Data); err == nil {
-				m.Ack()
-			} else {
 				config.Logger.Errorf("Worker error: %v", err.Error())
 			}
-		}
 
+			return err
+		})
 	}
 }
