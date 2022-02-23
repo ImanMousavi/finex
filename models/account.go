@@ -1,13 +1,11 @@
 package models
 
 import (
-	"encoding/json"
 	"fmt"
 	"time"
 
 	"github.com/shopspring/decimal"
 	"github.com/zsmartex/finex/config"
-	"github.com/zsmartex/finex/mq_client"
 	"github.com/zsmartex/finex/types"
 	"gorm.io/gorm"
 )
@@ -50,9 +48,8 @@ func (a *Account) Member() *Member {
 
 func (a *Account) TriggerEvent() {
 	member := a.Member()
-	payload_message, _ := json.Marshal(a.ToJSON())
 
-	mq_client.EnqueueEvent("private", member.UID, "balance", payload_message)
+	config.RangoClient.EnqueueEvent("private", member.UID, "balance", a.ToJSON())
 }
 
 func (a *Account) PlusFunds(tx *gorm.DB, amount decimal.Decimal) error {

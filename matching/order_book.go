@@ -1,7 +1,6 @@
 package matching
 
 import (
-	"encoding/json"
 	"os"
 	"strconv"
 	"sync"
@@ -17,14 +16,12 @@ import (
 	GrpcQuantex "github.com/zsmartex/pkg/Grpc/quantex"
 	GrpcUtils "github.com/zsmartex/pkg/Grpc/utils"
 	clientQuantex "github.com/zsmartex/pkg/client/quantex"
-	"github.com/zsmartex/pkg/order"
-	"github.com/zsmartex/pkg/trade"
 )
 
 type OrderBook struct {
 	matchMutex         sync.Mutex
 	orderMutex         sync.Mutex
-	Symbol             string
+	Symbol             pkg.Symbol
 	MarketPrice        decimal.Decimal
 	Depth              *Depth
 	StopBids           *redblacktree.Tree
@@ -40,8 +37,8 @@ const (
 
 // StopComparator is used for comparing Key.
 func StopComparator(a, b interface{}) (result int) {
-	this := a.(*order.OrderKey)
-	that := b.(*order.OrderKey)
+	this := a.(*pkg.OrderKey)
+	that := b.(*pkg.OrderKey)
 
 	if this.Side != that.Side {
 		config.Logger.Errorf("[oceanbook.orderbook] compare order with different sides")
@@ -53,16 +50,16 @@ func StopComparator(a, b interface{}) (result int) {
 
 	// based on ask
 	switch {
-	case this.Side == order.SideSell && this.StopPrice.LessThan(that.StopPrice):
+	case this.Side == pkg.SideSell && this.StopPrice.LessThan(that.StopPrice):
 		result = 1
 
-	case this.Side == order.SideSell && this.StopPrice.GreaterThan(that.StopPrice):
+	case this.Side == pkg.SideSell && this.StopPrice.GreaterThan(that.StopPrice):
 		result = -1
 
-	case this.Side == order.SideBuy && this.StopPrice.LessThan(that.StopPrice):
+	case this.Side == pkg.SideBuy && this.StopPrice.LessThan(that.StopPrice):
 		result = -1
 
-	case this.Side == order.SideBuy && this.StopPrice.GreaterThan(that.StopPrice):
+	case this.Side == pkg.SideBuy && this.StopPrice.GreaterThan(that.StopPrice):
 		result = 1
 
 	default:
@@ -76,7 +73,7 @@ func StopComparator(a, b interface{}) (result int) {
 	return
 }
 
-func NewOrderBook(symbol string, market_price decimal.Decimal) *OrderBook {
+func NewOrderBook(symbol pkg.Symbol, market_price decimal.Decimal) *OrderBook {
 	var quantex_client *clientQuantex.GrpcQuantexClient
 	quantexEnabled, _ := strconv.ParseBool(os.Getenv("QUANTEX_ENABLED"))
 
@@ -97,13 +94,11 @@ func NewOrderBook(symbol string, market_price decimal.Decimal) *OrderBook {
 	return ob
 }
 
-func (ob *OrderBook) GetOrder()
-
-func (ob *OrderBook) CalcMarketOrder(side order.OrderSide, quantity decimal.NullDecimal, volume decimal.NullDecimal) *GrpcEngine.CalcMarketOrderResponse {
+func (ob *OrderBook) CalcMarketOrder(side pkg.OrderSide, quantity decimal.NullDecimal, volume decimal.NullDecimal) *GrpcEngine.CalcMarketOrderResponse {
 	zero := decimal.Zero
 
 	var book *redblacktree.Tree
-	if side == order.SideSell {
+	if side == pkg.SideSell {
 		book = ob.Depth.Bids
 	} else {
 		book = ob.Depth.Asks
@@ -140,7 +135,7 @@ func (ob *OrderBook) CalcMarketOrder(side order.OrderSide, quantity decimal.Null
 			order_quantity = order_quantity.Add(v)
 			expected = expected.Sub(v)
 
-			if pl.Side == order.SideSell {
+			if pl.Side == pkg.SideSell {
 				required = required.Add(pl.Price.Mul(v))
 			} else {
 				required = required.Add(v)
@@ -197,7 +192,7 @@ func (ob *OrderBook) setMarketPrice(newPrice decimal.Decimal) {
 				break
 			}
 
-			bestOrder := best.Value.(*order.Order)
+			bestOrder := best.Value.(*pkg.Order)
 			if bestOrder.StopPrice.LessThan(newPrice) {
 				break
 			}
@@ -216,7 +211,7 @@ func (ob *OrderBook) setMarketPrice(newPrice decimal.Decimal) {
 				break
 			}
 
-			bestOrder := best.Value.(*order.Order)
+			bestOrder := best.Value.(*pkg.Order)
 			if bestOrder.StopPrice.GreaterThan(newPrice) {
 				break
 			}
@@ -233,16 +228,16 @@ func (ob *OrderBook) setMarketPrice(newPrice decimal.Decimal) {
 	}
 }
 
-func (ob *OrderBook) Add(o *order.Order) {
+func (ob *OrderBook) Add(o *pkg.Order) {
 	ob.orderMutex.Lock()
 	defer ob.orderMutex.Unlock()
 
 	if o.StopPrice.IsPositive() {
 		var book *redblacktree.Tree
 		switch o.Side {
-		case order.SideSell:
+		case pkg.SideSell:
 			book = ob.StopAsks
-		case order.SideBuy:
+		case pkg.SideBuy:
 			book = ob.StopBids
 		}
 
@@ -269,7 +264,7 @@ func (ob *OrderBook) Add(o *order.Order) {
 	ob.pendingOrdersQueue.Clear()
 }
 
-func (ob *OrderBook) Remove(key *order.OrderKey) {
+func (ob *OrderBook) Remove(key *pkg.OrderKey) {
 	ob.orderMutex.Lock()
 	ob.matchMutex.Lock()
 	defer ob.orderMutex.Unlock()
@@ -282,25 +277,19 @@ func (ob *OrderBook) Remove(key *order.OrderKey) {
 	}
 }
 
-func (ob *OrderBook) PublishCancel(key *order.OrderKey) error {
-	order_processor_message, err := json.Marshal(map[string]interface{}{
+func (ob *OrderBook) PublishCancel(key *pkg.OrderKey) {
+	config.KafkaProducer.Produce("order_processor", map[string]interface{}{
 		"action": pkg.ActionCancel,
 		"id":     key.ID,
 	})
-
-	if err != nil {
-		return err
-	}
-
-	return config.Kafka.Publish("order_processor", order_processor_message)
 }
 
-func (ob *OrderBook) Match(maker *order.Order) {
+func (ob *OrderBook) Match(order *pkg.Order) {
 	ob.matchMutex.Lock()
 	defer ob.matchMutex.Unlock()
 	var offers *redblacktree.Tree
 
-	if maker.IsAsk() {
+	if order.IsAsk() {
 		offers = ob.Depth.Bids
 	} else {
 		offers = ob.Depth.Asks
@@ -317,107 +306,122 @@ func (ob *OrderBook) Match(maker *order.Order) {
 			continue
 		}
 
-		taker := price_level.Top()
+		counter_order := price_level.Top()
 
-		quantity := decimal.Min(maker.UnfilledQuantity(), taker.UnfilledQuantity())
+		quantity := decimal.Min(order.UnfilledQuantity(), counter_order.UnfilledQuantity())
 
-		if maker.Type == order.TypeLimit {
-			if !maker.IsCrossed(taker.Price) {
+		if order.Type == pkg.TypeLimit {
+			if !order.IsCrossed(counter_order.Price) {
 				break
 			}
 		}
 
-		maker.Fill(quantity)
-		taker.Fill(quantity)
+		order.Fill(quantity)
+		counter_order.Fill(quantity)
 
-		trade := &trade.Trade{
-			Symbol:     ob.Symbol,
-			Price:      taker.Price,
-			Quantity:   quantity,
-			Total:      taker.Price.Mul(quantity),
-			MakerOrder: *maker,
-			TakerOrder: *taker,
-		}
-
-		if taker.Filled() || taker.Cancelled {
-			ob.Depth.Remove(taker.Key())
+		if counter_order.Filled() || counter_order.Cancelled {
+			ob.Depth.Remove(counter_order.Key())
 		} else {
-			ob.Depth.Add(taker)
+			ob.Depth.Add(counter_order)
 		}
-		ob.setMarketPrice(taker.Price)
+		ob.setMarketPrice(counter_order.Price)
 
-		if taker.IsFake() {
+		if counter_order.IsFake() {
 			ob.quantexClient.UpdateOrder(&GrpcQuantex.UpdateOrderRequest{
 				Order: &GrpcOrder.Order{
-					Id:       taker.ID,
-					Uuid:     taker.UUID[:],
-					MemberId: taker.MemberID,
-					Symbol:   taker.Symbol,
-					Side:     string(taker.Side),
-					Type:     string(taker.Type),
+					Id:       counter_order.ID,
+					Uuid:     counter_order.UUID[:],
+					MemberId: counter_order.MemberID,
+					Symbol:   counter_order.Symbol,
+					Side:     string(counter_order.Side),
+					Type:     string(counter_order.Type),
 					Price: &GrpcUtils.Decimal{
-						Val: taker.Price.CoefficientInt64(),
-						Exp: taker.Price.Exponent(),
+						Val: counter_order.Price.CoefficientInt64(),
+						Exp: counter_order.Price.Exponent(),
 					},
 					StopPrice: &GrpcUtils.Decimal{
-						Val: taker.StopPrice.CoefficientInt64(),
-						Exp: taker.StopPrice.Exponent(),
+						Val: counter_order.StopPrice.CoefficientInt64(),
+						Exp: counter_order.StopPrice.Exponent(),
 					},
 					Quantity: &GrpcUtils.Decimal{
-						Val: taker.Quantity.CoefficientInt64(),
-						Exp: taker.Quantity.Exponent(),
+						Val: counter_order.Quantity.CoefficientInt64(),
+						Exp: counter_order.Quantity.Exponent(),
 					},
 					FilledQuantity: &GrpcUtils.Decimal{
-						Val: taker.FilledQuantity.CoefficientInt64(),
-						Exp: taker.FilledQuantity.Exponent(),
+						Val: counter_order.FilledQuantity.CoefficientInt64(),
+						Exp: counter_order.FilledQuantity.Exponent(),
 					},
-					Fake:      taker.Fake,
-					Cancelled: taker.Cancelled,
-					CreatedAt: timestamppb.New(taker.CreatedAt),
+					Fake:      counter_order.Fake,
+					Cancelled: counter_order.Cancelled,
+					CreatedAt: timestamppb.New(counter_order.CreatedAt),
 				},
 			})
+
+			trade := &pkg.Trade{
+				Symbol:   ob.Symbol,
+				Price:    counter_order.Price,
+				Quantity: quantity,
+				Total:    counter_order.Price.Mul(quantity),
+			}
+
+			ob.PublishTrade(order, counter_order, trade)
 		}
 
-		trade_message, _ := json.Marshal(trade)
-		config.Kafka.Publish("trade_executor", trade_message)
-
-		if maker.Filled() {
+		if order.Filled() {
 			return
 		}
 	}
 
-	if maker.UnfilledQuantity().IsPositive() && maker.Type == order.TypeLimit {
-		ob.Depth.Add(maker)
-		if maker.IsFake() {
+	if order.UnfilledQuantity().IsPositive() && order.Type == pkg.TypeLimit {
+		ob.Depth.Add(order)
+		if order.IsFake() {
 			ob.quantexClient.UpdateOrder(&GrpcQuantex.UpdateOrderRequest{
 				Order: &GrpcOrder.Order{
-					Id:       maker.ID,
-					Uuid:     maker.UUID[:],
-					MemberId: maker.MemberID,
-					Symbol:   maker.Symbol,
-					Side:     string(maker.Side),
-					Type:     string(maker.Type),
+					Id:       order.ID,
+					Uuid:     order.UUID[:],
+					MemberId: order.MemberID,
+					Symbol:   order.Symbol,
+					Side:     string(order.Side),
+					Type:     string(order.Type),
 					Price: &GrpcUtils.Decimal{
-						Val: maker.Price.CoefficientInt64(),
-						Exp: maker.Price.Exponent(),
+						Val: order.Price.CoefficientInt64(),
+						Exp: order.Price.Exponent(),
 					},
 					StopPrice: &GrpcUtils.Decimal{
-						Val: maker.StopPrice.CoefficientInt64(),
-						Exp: maker.StopPrice.Exponent(),
+						Val: order.StopPrice.CoefficientInt64(),
+						Exp: order.StopPrice.Exponent(),
 					},
 					Quantity: &GrpcUtils.Decimal{
-						Val: maker.Quantity.CoefficientInt64(),
-						Exp: maker.Quantity.Exponent(),
+						Val: order.Quantity.CoefficientInt64(),
+						Exp: order.Quantity.Exponent(),
 					},
 					FilledQuantity: &GrpcUtils.Decimal{
-						Val: maker.FilledQuantity.CoefficientInt64(),
-						Exp: maker.FilledQuantity.Exponent(),
+						Val: order.FilledQuantity.CoefficientInt64(),
+						Exp: order.FilledQuantity.Exponent(),
 					},
-					Fake:      maker.Fake,
-					Cancelled: maker.Cancelled,
-					CreatedAt: timestamppb.New(maker.CreatedAt),
+					Fake:      order.Fake,
+					Cancelled: order.Cancelled,
+					CreatedAt: timestamppb.New(order.CreatedAt),
 				},
 			})
 		}
 	}
+}
+
+func (ob *OrderBook) PublishTrade(order, counter_order *pkg.Order, trade *pkg.Trade) {
+	var maker_order pkg.Order
+	var taker_order pkg.Order
+
+	if order.CreatedAt.Before(counter_order.CreatedAt) {
+		maker_order = *order
+		taker_order = *counter_order
+	} else {
+		maker_order = *counter_order
+		taker_order = *order
+	}
+
+	trade.MakerOrder = maker_order
+	trade.TakerOrder = taker_order
+
+	config.KafkaProducer.Produce("trade_executor", trade)
 }

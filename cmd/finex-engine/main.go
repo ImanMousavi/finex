@@ -4,11 +4,9 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/confluentinc/confluent-kafka-go/kafka"
-
 	"github.com/zsmartex/finex/config"
-	"github.com/zsmartex/finex/mq_client"
 	"github.com/zsmartex/finex/workers/engines"
+	"github.com/zsmartex/pkg/services"
 )
 
 func CreateWorker(id string) engines.Worker {
@@ -31,24 +29,33 @@ func main() {
 		fmt.Println(err.Error())
 		return
 	}
-	mq_client.Connect()
 
 	ARVG := os.Args[1:]
+	id := ARVG[0]
+	consumer, err := services.NewKafkaConsumer("zsmartex", []string{id})
+	if err != nil {
+		panic(err)
+	}
 
-	for _, id := range ARVG {
-		fmt.Println("Start finex-engine: " + id)
-		worker := CreateWorker(id)
+	fmt.Println("Start finex-engine: " + id)
+	worker := CreateWorker(id)
 
-		config.Kafka.Subscribe(id, func(c *kafka.Consumer, e kafka.Event) error {
-			config.Logger.Infof("Receive message: %s", e.String())
+	defer consumer.Close()
 
-			err := worker.Process([]byte(e.String()))
+	for {
+		records, err := consumer.Poll()
+		if err != nil {
+			config.Logger.Fatalf("Failed to poll consumer %v", err)
+		}
+
+		for _, record := range records {
+			err := worker.Process(record.Value)
 
 			if err != nil {
 				config.Logger.Errorf("Worker error: %v", err.Error())
 			}
 
-			return err
-		})
+			consumer.CommitRecords(*record)
+		}
 	}
 }

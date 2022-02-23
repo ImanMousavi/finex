@@ -5,22 +5,22 @@ import (
 
 	"github.com/emirpasic/gods/lists/arraylist"
 	"github.com/shopspring/decimal"
-	"github.com/zsmartex/pkg/order"
+	"github.com/zsmartex/pkg"
 )
 
 type PriceLevel struct {
 	sync.Mutex
-	Side   order.OrderSide
+	Side   pkg.OrderSide
 	Price  decimal.Decimal
 	Orders *arraylist.List
 }
 
 type PriceLevelKey struct {
-	Side  order.OrderSide
+	Side  pkg.OrderSide
 	Price decimal.Decimal
 }
 
-func NewPriceLevel(side order.OrderSide, price decimal.Decimal) *PriceLevel {
+func NewPriceLevel(side pkg.OrderSide, price decimal.Decimal) *PriceLevel {
 	return &PriceLevel{
 		Side:   side,
 		Price:  price,
@@ -35,12 +35,12 @@ func (p *PriceLevel) Key() *PriceLevelKey {
 	}
 }
 
-func (p *PriceLevel) Add(o *order.Order) {
+func (p *PriceLevel) Add(o *pkg.Order) {
 	p.Lock()
 	defer p.Unlock()
 
 	index, _ := p.Orders.Find(func(index int, value interface{}) bool {
-		order := value.(*order.Order)
+		order := value.(*pkg.Order)
 
 		return order.UUID == o.UUID
 	})
@@ -51,11 +51,11 @@ func (p *PriceLevel) Add(o *order.Order) {
 	}
 }
 
-func (p *PriceLevel) Get(key *order.OrderKey) *order.Order {
+func (p *PriceLevel) Get(key *pkg.OrderKey) *pkg.Order {
 	p.Lock()
 	defer p.Unlock()
 	index, value := p.Orders.Find(func(index int, value interface{}) bool {
-		order := value.(*order.Order)
+		order := value.(*pkg.Order)
 
 		return order.UUID == key.UUID
 	})
@@ -63,15 +63,15 @@ func (p *PriceLevel) Get(key *order.OrderKey) *order.Order {
 		return nil
 	}
 
-	return value.(*order.Order)
+	return value.(*pkg.Order)
 }
 
-func (p *PriceLevel) Top() *order.Order {
+func (p *PriceLevel) Top() *pkg.Order {
 	value, found := p.Orders.Get(0)
 	if !found {
 		return nil
 	}
-	return value.(*order.Order)
+	return value.(*pkg.Order)
 }
 
 func (p *PriceLevel) Empty() bool {
@@ -87,18 +87,18 @@ func (p *PriceLevel) Total() decimal.Decimal {
 	defer p.Unlock()
 	total := decimal.Zero
 	p.Orders.Each(func(index int, value interface{}) {
-		order := value.(*order.Order)
+		order := value.(*pkg.Order)
 
 		total = total.Add(order.UnfilledQuantity())
 	})
 	return total
 }
 
-func (p *PriceLevel) Remove(key *order.OrderKey) {
+func (p *PriceLevel) Remove(key *pkg.OrderKey) {
 	p.Lock()
 	defer p.Unlock()
 	index, _ := p.Orders.Find(func(index int, value interface{}) bool {
-		order := value.(*order.Order)
+		order := value.(*pkg.Order)
 
 		return order.UUID == key.UUID
 	})
@@ -109,8 +109,8 @@ func (p *PriceLevel) Remove(key *order.OrderKey) {
 }
 
 func OrderComparator(a, b interface{}) int {
-	aKey := a.(*order.Order)
-	bKey := b.(*order.Order)
+	aKey := a.(*pkg.Order)
+	bKey := b.(*pkg.Order)
 
 	if aKey.CreatedAt.Before(bKey.CreatedAt) {
 		return 1

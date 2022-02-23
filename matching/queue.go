@@ -1,28 +1,28 @@
 package matching
 
-import "github.com/zsmartex/pkg/order"
+import "github.com/zsmartex/pkg"
 
 // OrderQueue is the FIFO queue to store orders.
 type OrderQueue struct {
 	size   int64
-	values []*order.Order
+	values []*pkg.Order
 }
 
 // NewOrderQueue returns an order queue.
 func NewOrderQueue(size int64) *OrderQueue {
 	return &OrderQueue{
 		size:   size,
-		values: make([]*order.Order, 0, size),
+		values: make([]*pkg.Order, 0, size),
 	}
 }
 
 // Push appends an order to the end of order queue.
-func (oq *OrderQueue) Push(o *order.Order) {
+func (oq *OrderQueue) Push(o *pkg.Order) {
 	oq.values = append(oq.values, o)
 }
 
 // First returns the first order in order queue.
-func (oq *OrderQueue) First() *order.Order {
+func (oq *OrderQueue) First() *pkg.Order {
 	if oq.Size() <= 0 {
 		return nil
 	}
@@ -31,7 +31,7 @@ func (oq *OrderQueue) First() *order.Order {
 }
 
 // Pop removes and returns the first order in the order queue.
-func (oq *OrderQueue) Pop() *order.Order {
+func (oq *OrderQueue) Pop() *pkg.Order {
 	if oq.Size() <= 0 {
 		return nil
 	}
@@ -44,11 +44,11 @@ func (oq *OrderQueue) Pop() *order.Order {
 
 // Clear removes all orders.
 func (oq *OrderQueue) Clear() {
-	oq.values = make([]*order.Order, 0, oq.size)
+	oq.values = make([]*pkg.Order, 0, oq.size)
 }
 
 // Values returns all orders.
-func (oq *OrderQueue) Values() []*order.Order {
+func (oq *OrderQueue) Values() []*pkg.Order {
 	return oq.values
 }
 

@@ -12,7 +12,8 @@ import (
 
 var DataBase *gorm.DB
 var Logger *logrus.Entry
-var Kafka *services.KafkaClient
+var KafkaProducer *services.KafkaProducer
+var RangoClient *services.RangoClient
 var Referral *types.Referral
 
 func InitializeConfig() error {
@@ -23,7 +24,15 @@ func InitializeConfig() error {
 	}
 
 	DataBase = db
-	Kafka = services.NewKafka()
+	KafkaProducer, err = services.NewKafkaProducer(Logger)
+	if err != nil {
+		return err
+	}
+
+	RangoClient, err = services.NewRangoClient(KafkaProducer)
+	if err != nil {
+		return err
+	}
 
 	if err := NewCacheService(); err != nil {
 		return err

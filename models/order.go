@@ -2,7 +2,6 @@ package models
 
 import (
 	"database/sql"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"strconv"
@@ -17,10 +16,8 @@ import (
 	"github.com/zsmartex/finex/config"
 	"github.com/zsmartex/finex/controllers/entities"
 	"github.com/zsmartex/finex/models/concerns"
-	"github.com/zsmartex/finex/mq_client"
 	"github.com/zsmartex/finex/types"
 	"github.com/zsmartex/pkg"
-	"github.com/zsmartex/pkg/order"
 )
 
 var precision_validator = &concerns.PrecisionValidator{}
@@ -227,11 +224,10 @@ func SubmitOrder(id int64) error {
 		order.State = StateWait
 		tx.Save(order)
 
-		payload_matching_attrs, _ := json.Marshal(map[string]interface{}{
+		config.KafkaProducer.Produce("matching", map[string]interface{}{
 			"action": pkg.ActionSubmit,
 			"order":  order.ToMatchingAttributes(),
 		})
-		config.Kafka.Publish("matching", payload_matching_attrs)
 
 		return nil
 	})
@@ -292,12 +288,11 @@ func (o *Order) Submit() error {
 
 	config.DataBase.Save(&o)
 
-	order_processor_payload, _ := json.Marshal(map[string]interface{}{
+	config.KafkaProducer.Produce("order_processor", map[string]interface{}{
 		"action": pkg.ActionSubmit,
 		"id":     o.ID,
 	})
 
-	config.Kafka.Publish("order_processor", order_processor_payload)
 	return nil
 }
 
@@ -313,9 +308,8 @@ func (o *Order) TriggerEvent() {
 	}
 
 	member := o.Member()
-	payload_message, _ := json.Marshal(o.ToJSON())
 
-	mq_client.EnqueueEvent("private", member.UID, "order", payload_message)
+	config.RangoClient.EnqueueEvent("private", member.UID, "order", o.ToJSON())
 }
 
 func (o *Order) RecordSubmitOperations() {
@@ -527,25 +521,27 @@ func FloatToString(input_num float64) string {
 	return strconv.FormatFloat(input_num, 'f', 6, 64)
 }
 
-func (o *Order) ToMatchingAttributes() *order.Order {
-	var side order.OrderSide
+func (o *Order) ToMatchingAttributes() *pkg.Order {
+	var side pkg.OrderSide
 	if o.Type == SideBuy {
-		side = order.SideBuy
+		side = pkg.SideBuy
 	} else {
-		side = order.SideSell
+		side = pkg.SideSell
 	}
 
-	var orderType order.OrderType
+	var orderType pkg.OrderType
 	if o.OrdType == types.TypeLimit {
-		orderType = order.TypeLimit
+		orderType = pkg.TypeLimit
 	} else if o.OrdType == types.TypeMarket {
-		orderType = order.TypeMarket
+		orderType = pkg.TypeMarket
 	}
 
-	return &order.Order{
+	market := o.Market()
+
+	return &pkg.Order{
 		ID:             o.ID,
 		UUID:           o.UUID,
-		Symbol:         o.MarketID,
+		Symbol:         pkg.Symbol{BaseCurrency: market.BaseUnit, QuoteCurrency: market.QuoteUnit},
 		MemberID:       o.MemberID,
 		Side:           side,
 		Type:           orderType,

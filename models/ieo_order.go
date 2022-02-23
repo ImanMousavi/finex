@@ -1,7 +1,6 @@
 package models
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
 	"time"
@@ -9,7 +8,6 @@ import (
 	"github.com/google/uuid"
 	"github.com/shopspring/decimal"
 	"github.com/zsmartex/finex/config"
-	"github.com/zsmartex/finex/mq_client"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 )
@@ -91,8 +89,7 @@ func SubmitIEOOrder(id int64) error {
 		order.State = StateWait
 		tx.Save(&order)
 
-		payload_ieo_order_executor_attrs, _ := json.Marshal(order.ToJSON())
-		config.Kafka.Publish("ieo_order_executor", payload_ieo_order_executor_attrs)
+		config.KafkaProducer.Produce("ieo_order_executor", order.ToJSON())
 
 		return nil
 	})
@@ -165,8 +162,7 @@ func (o *IEOOrder) Strike() error {
 		tx.Save(&o)
 		tx.Save(&ieo)
 
-		payload_msg, _ := json.Marshal(o.ToJSON())
-		mq_client.EnqueueEvent("private", member.UID, "ieo", payload_msg)
+		config.RangoClient.EnqueueEvent("private", member.UID, "ieo", o.ToJSON())
 
 		return nil
 	})

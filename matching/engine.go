@@ -4,21 +4,21 @@ import (
 	"sync"
 
 	"github.com/shopspring/decimal"
-	"github.com/zsmartex/pkg/order"
+	"github.com/zsmartex/pkg"
 )
 
 type Engine struct {
 	MatchingMutex sync.RWMutex
-	Market        string
+	Symbol        pkg.Symbol
 	OrderBook     *OrderBook
 	Initialized   bool
 }
 
-func NewEngine(market string, price decimal.Decimal) *Engine {
+func NewEngine(symbol pkg.Symbol, price decimal.Decimal) *Engine {
 	engine := &Engine{
-		Market: market,
+		Symbol: symbol,
 		OrderBook: NewOrderBook(
-			market,
+			symbol,
 			price,
 		),
 		Initialized: false,
@@ -27,20 +27,20 @@ func NewEngine(market string, price decimal.Decimal) *Engine {
 	return engine
 }
 
-func (e *Engine) Submit(o *order.Order) {
+func (e *Engine) Submit(o *pkg.Order) {
 	e.MatchingMutex.Lock()
 	defer e.MatchingMutex.Unlock()
 
 	e.OrderBook.Add(o)
 }
 
-func (e *Engine) CancelWithKey(key *order.OrderKey) {
+func (e *Engine) CancelWithKey(key *pkg.OrderKey) {
 	e.MatchingMutex.Lock()
 	defer e.MatchingMutex.Unlock()
 
 	e.OrderBook.Remove(key)
 }
 
-func (e *Engine) Cancel(o *order.Order) {
+func (e *Engine) Cancel(o *pkg.Order) {
 	e.CancelWithKey(o.Key())
 }

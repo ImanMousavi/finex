@@ -1,6 +1,7 @@
 package controllers
 
 import (
+	"log"
 	"time"
 
 	"github.com/gofiber/fiber/v2"
@@ -114,6 +115,8 @@ func GetDepth(c *fiber.Ctx) error {
 		Limit:  params.Limit,
 	})
 	if err != nil {
+		log.Println(err)
+
 		return c.Status(200).JSON(depth)
 	}
 

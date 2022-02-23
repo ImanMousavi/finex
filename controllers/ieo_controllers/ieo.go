@@ -1,7 +1,6 @@
 package ieo_controllers
 
 import (
-	"encoding/json"
 	"errors"
 	"strings"
 
@@ -127,8 +126,7 @@ func CreateIEOOrder(c *fiber.Ctx) error {
 
 	config.DataBase.Create(&ieo_order)
 
-	payload_ieo_order_processor_attrs, _ := json.Marshal(ieo_order.ToJSON())
-	config.Kafka.Publish("ieo_order_processor", payload_ieo_order_processor_attrs)
+	config.KafkaProducer.Produce("ieo_order_processor", ieo_order.ToJSON())
 
 	return c.Status(201).JSON(ieo_order.ToJSON())
 }

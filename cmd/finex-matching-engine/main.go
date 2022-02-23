@@ -6,12 +6,12 @@ import (
 	"net"
 	"os"
 
-	"github.com/confluentinc/confluent-kafka-go/kafka"
+	GrpcEngine "github.com/zsmartex/pkg/Grpc/engine"
+	"github.com/zsmartex/pkg/services"
+	"google.golang.org/grpc"
+
 	"github.com/zsmartex/finex/config"
 	engine "github.com/zsmartex/finex/server"
-	GrpcEngine "github.com/zsmartex/pkg/Grpc/engine"
-
-	"google.golang.org/grpc"
 )
 
 func main() {
@@ -23,19 +23,34 @@ func main() {
 	server := engine.NewEngineServer()
 	grpcServer := grpc.NewServer()
 
-	config.Kafka.Subscribe("matching", func(c *kafka.Consumer, e kafka.Event) error {
-		config.Logger.Infof("Receive message: %s", e.String())
+	consumer, err := services.NewKafkaConsumer("zsmartex", []string{"matching"})
+	if err != nil {
+		panic(err)
+	}
 
-		err := server.Process([]byte(e.String()))
+	defer consumer.Close()
 
-		if err != nil {
-			config.Logger.Errorf("Worker error: %v", err.Error())
+	go func() {
+		for {
+			records, err := consumer.Poll()
+			if err != nil {
+				config.Logger.Fatalf("Failed to poll consumer %v", err)
+			}
+
+			for _, record := range records {
+				config.Logger.Debugf("Recevie message: %s", string(record.Value))
+				err := server.Process(record.Value)
+
+				if err != nil {
+					config.Logger.Fatalf("Worker error: %v", err.Error())
+				}
+
+				consumer.CommitRecords(*record)
+			}
 		}
+	}()
 
-		return err
-	})
-
-	config.Logger.Println("Starting Finex G-RPC")
+	config.Logger.Info("Starting Finex G-RPC")
 
 	lis, err := net.Listen("tcp", fmt.Sprintf(":%s", os.Getenv("ENGINE_PORT")))
 	if err != nil {

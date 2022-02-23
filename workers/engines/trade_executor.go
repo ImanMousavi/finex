@@ -4,18 +4,16 @@ import (
 	"encoding/json"
 	"fmt"
 	"strconv"
+	"strings"
 	"sync"
 
 	"github.com/zsmartex/pkg"
-	"github.com/zsmartex/pkg/order"
-	"github.com/zsmartex/pkg/trade"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 
 	"github.com/shopspring/decimal"
 	"github.com/zsmartex/finex/config"
 	"github.com/zsmartex/finex/models"
-	"github.com/zsmartex/finex/mq_client"
 	"github.com/zsmartex/finex/types"
 )
 
@@ -24,7 +22,7 @@ type TradeExecutorWorker struct {
 }
 
 type TradeExecutor struct {
-	TradePayload *trade.Trade
+	TradePayload *pkg.Trade
 	MakerOrder   *models.Order
 	TakerOrder   *models.Order
 }
@@ -64,16 +62,10 @@ func (w *TradeExecutorWorker) Process(payload []byte) error {
 				continue
 			}
 
-			matching_payload_message, err := json.Marshal(map[string]interface{}{
+			config.KafkaProducer.Produce("matching", map[string]interface{}{
 				"action": pkg.ActionSubmit,
 				"order":  order.ToMatchingAttributes(),
 			})
-
-			if err != nil {
-				continue
-			}
-
-			config.Kafka.Publish("matching", matching_payload_message)
 		}
 		return err
 	}
@@ -193,7 +185,7 @@ func (t *TradeExecutor) CreateTradeAndStrikeOrders() (*models.Trade, error) {
 		}
 
 		var side types.TakerType
-		if t.TradePayload.TakerOrder.Side == order.SideSell {
+		if t.TradePayload.TakerOrder.Side == pkg.SideSell {
 			side = types.TypeSell
 		} else {
 			side = types.TypeBuy
@@ -205,7 +197,7 @@ func (t *TradeExecutor) CreateTradeAndStrikeOrders() (*models.Trade, error) {
 			Total:        t.TradePayload.Total,
 			MakerOrderID: t.TradePayload.MakerOrder.ID,
 			TakerOrderID: t.TradePayload.TakerOrder.ID,
-			MarketID:     t.TradePayload.Symbol,
+			MarketID:     strings.ToLower(t.TradePayload.Symbol.ToSymbol("")),
 			MakerID:      t.TradePayload.MakerOrder.MemberID,
 			TakerID:      t.TradePayload.TakerOrder.MemberID,
 			TakerType:    side,
@@ -301,21 +293,17 @@ func (t *TradeExecutor) Strike(trade *models.Trade, order *models.Order, outcome
 func (t *TradeExecutor) PublishTrade(trade *models.Trade) {
 	if !t.IsMakerOrderFake() {
 		maker := trade.Maker()
-		if payload_message, err := json.Marshal(trade.ForUser(maker)); err == nil {
-			mq_client.EnqueueEvent("private", maker.UID, "trade", payload_message)
-		}
+		config.RangoClient.EnqueueEvent("private", maker.UID, "trade", trade.ForUser(maker))
 	}
 
 	if !t.IsTakerOrderFake() {
 		taker := trade.Taker()
-		if payload_message, err := json.Marshal(trade.ForUser(taker)); err == nil {
-			mq_client.EnqueueEvent("private", taker.UID, "trade", payload_message)
-		}
+		config.RangoClient.EnqueueEvent("private", taker.UID, "trade", trade.ForUser(taker))
 	}
 
-	if payload_message, err := json.Marshal(map[string]interface{}{"trades": &[]interface{}{trade.TradeGlobalJSON()}}); err == nil {
-		mq_client.EnqueueEvent("public", trade.MarketID, "trades", payload_message)
-	}
+	config.RangoClient.EnqueueEvent("public", trade.MarketID, "trades", map[string]interface{}{
+		"trades": []interface{}{trade.TradeGlobalJSON()},
+	})
 
 	trade.WriteToInflux()
 }

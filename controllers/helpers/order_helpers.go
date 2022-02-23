@@ -4,10 +4,10 @@ import (
 	"github.com/gookit/validate"
 	"github.com/shopspring/decimal"
 
+	"github.com/zsmartex/pkg"
 	GrpcEngine "github.com/zsmartex/pkg/Grpc/engine"
 	GrpcUtils "github.com/zsmartex/pkg/Grpc/utils"
 	clientEngine "github.com/zsmartex/pkg/client/engine"
-	"github.com/zsmartex/pkg/order"
 
 	"github.com/zsmartex/finex/config"
 	"github.com/zsmartex/finex/models"
@@ -101,12 +101,12 @@ func (p CreateOrderParams) BuildOrder(member *models.Member, err_src *Errors) *m
 	var locked decimal.Decimal
 
 	if p.OrdType == types.TypeMarket {
-		var side order.OrderSide
+		var side pkg.OrderSide
 
 		if p.Side == types.SideBuy {
-			side = order.SideBuy
+			side = pkg.SideBuy
 		} else {
-			side = order.SideSell
+			side = pkg.SideSell
 		}
 
 		matching_client := clientEngine.NewMatchingClient()

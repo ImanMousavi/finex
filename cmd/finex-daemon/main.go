@@ -5,7 +5,6 @@ import (
 	"os"
 
 	"github.com/zsmartex/finex/config"
-	"github.com/zsmartex/finex/mq_client"
 	"github.com/zsmartex/finex/workers/daemons"
 )
 
@@ -23,7 +22,6 @@ func main() {
 		fmt.Println(err.Error())
 		return
 	}
-	mq_client.Connect()
 
 	ARVG := os.Args[1:]
 

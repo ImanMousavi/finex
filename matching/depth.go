@@ -1,8 +1,7 @@
 package matching
 
 import (
-	"encoding/json"
-	"os"
+	"strings"
 	"sync"
 	"time"
 
@@ -10,11 +9,9 @@ import (
 	"github.com/shopspring/decimal"
 
 	"github.com/zsmartex/finex/config"
-	"github.com/zsmartex/finex/mq_client"
 	"github.com/zsmartex/pkg"
 	GrpcEngine "github.com/zsmartex/pkg/Grpc/engine"
 	GrpcUtils "github.com/zsmartex/pkg/Grpc/utils"
-	"github.com/zsmartex/pkg/order"
 )
 
 var MIN_PERIOD_TO_SNAPSHOT = 10 * time.Second
@@ -24,7 +21,7 @@ var MIN_INCREMENT_COUNT_TO_SNAPSHOT int64 = 20
 type Depth struct {
 	depthMutex sync.RWMutex
 
-	Symbol       string
+	Symbol       pkg.Symbol
 	Asks         *redblacktree.Tree
 	Bids         *redblacktree.Tree
 	Notification *Notification
@@ -35,7 +32,7 @@ type Depth struct {
 	// close
 }
 
-func NewDepth(symbol string) *Depth {
+func NewDepth(symbol pkg.Symbol) *Depth {
 	depth := &Depth{
 		Symbol:       symbol,
 		Asks:         redblacktree.NewWith(makeComparator),
@@ -46,11 +43,11 @@ func NewDepth(symbol string) *Depth {
 	return depth
 }
 
-func (d *Depth) Add(o *order.Order) {
+func (d *Depth) Add(o *pkg.Order) {
 	d.depthMutex.Lock()
 	defer d.depthMutex.Unlock()
 	var price_levels *redblacktree.Tree
-	if o.Side == order.SideSell {
+	if o.Side == pkg.SideSell {
 		price_levels = d.Asks
 	} else {
 		price_levels = d.Bids
@@ -69,14 +66,14 @@ func (d *Depth) Add(o *order.Order) {
 
 	price_level := value.(*PriceLevel)
 	price_level.Add(o)
-	d.PublishIncrement(price_level.Side, price_level.Price, price_level.Total())
+	d.Notification.Publish(price_level.Side, price_level.Price, price_level.Total())
 }
 
-func (d *Depth) Remove(key *order.OrderKey) {
+func (d *Depth) Remove(key *pkg.OrderKey) {
 	d.depthMutex.Lock()
 	defer d.depthMutex.Unlock()
 	var price_levels *redblacktree.Tree
-	if key.Side == order.SideSell {
+	if key.Side == pkg.SideSell {
 		price_levels = d.Asks
 	} else {
 		price_levels = d.Bids
@@ -92,7 +89,7 @@ func (d *Depth) Remove(key *order.OrderKey) {
 
 	price_level := value.(*PriceLevel)
 	price_level.Remove(key)
-	d.PublishIncrement(price_level.Side, price_level.Price, price_level.Total())
+	d.Notification.Publish(pl.Side, pl.Price, pl.Total())
 
 	if price_level.Empty() || price_level.Total().IsZero() {
 		price_levels.Remove(pl.Key())
@@ -184,33 +181,11 @@ func (d *Depth) PublishSnapshot() {
 		}
 	}
 
-	payload := pkg.DepthJSON{
+	config.RangoClient.EnqueueEvent(pkg.EnqueueEventKindPublic, strings.ToLower(d.Symbol.ToSymbol("")), "ob-snap", pkg.DepthJSON{
 		Asks:     asks_depth,
 		Bids:     bids_depth,
 		Sequence: d.Notification.Sequence,
-	}
-
-	payload_message, _ := json.Marshal(payload)
-
-	if err := mq_client.ChanEnqueueEvent(d.Notification.Channel, "public", d.Symbol, "ob-snap", payload_message); err != nil {
-		config.Logger.Errorf("Error: %s", err.Error())
-	}
-}
-
-func (d *Depth) PublishIncrement(side order.OrderSide, price, quantity decimal.Decimal) {
-	if os.Getenv("UI") == "BASEAPP" {
-		if d.IncrementCount < MIN_INCREMENT_COUNT_TO_SNAPSHOT && !d.SnapshotTime.After(time.Now().Add(MAX_PERIOD_TO_SNAPSHOT*-1)) {
-			d.PublishSnapshot()
-			d.IncrementCount = 0
-		} else if d.IncrementCount >= MIN_INCREMENT_COUNT_TO_SNAPSHOT && d.SnapshotTime.Before(time.Now().Add(MIN_PERIOD_TO_SNAPSHOT*-1)) {
-			d.PublishSnapshot()
-			d.IncrementCount = 0
-		}
-
-		d.IncrementCount += 1
-	}
-
-	d.Notification.Publish(side, price, quantity)
+	})
 }
 
 func makeComparator(a, b interface{}) int {
@@ -218,16 +193,16 @@ func makeComparator(a, b interface{}) int {
 	bPriceLevel := b.(*PriceLevelKey)
 
 	switch {
-	case aPriceLevel.Side == order.SideSell && aPriceLevel.Price.LessThan(bPriceLevel.Price):
+	case aPriceLevel.Side == pkg.SideSell && aPriceLevel.Price.LessThan(bPriceLevel.Price):
 		return 1
 
-	case aPriceLevel.Side == order.SideSell && aPriceLevel.Price.GreaterThan(bPriceLevel.Price):
+	case aPriceLevel.Side == pkg.SideSell && aPriceLevel.Price.GreaterThan(bPriceLevel.Price):
 		return -1
 
-	case aPriceLevel.Side == order.SideBuy && aPriceLevel.Price.LessThan(bPriceLevel.Price):
+	case aPriceLevel.Side == pkg.SideBuy && aPriceLevel.Price.LessThan(bPriceLevel.Price):
 		return -1
 
-	case aPriceLevel.Side == order.SideBuy && aPriceLevel.Price.GreaterThan(bPriceLevel.Price):
+	case aPriceLevel.Side == pkg.SideBuy && aPriceLevel.Price.GreaterThan(bPriceLevel.Price):
 		return 1
 
 	default:

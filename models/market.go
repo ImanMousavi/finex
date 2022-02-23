@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/shopspring/decimal"
+	"github.com/zsmartex/pkg"
 )
 
 type Market struct {
@@ -24,6 +25,10 @@ type Market struct {
 	Data            string          `json:"data"`
 	CreatedAt       time.Time       `json:"created_at"`
 	UpdatedAt       time.Time       `json:"updated_at"`
+}
+
+func (m *Market) GetSymbol() pkg.Symbol {
+	return pkg.Symbol{BaseCurrency: m.BaseUnit, QuoteCurrency: m.QuoteUnit}
 }
 
 func (m Market) round_price(val decimal.Decimal) decimal.Decimal {

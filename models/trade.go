@@ -12,7 +12,7 @@ import (
 	api_admin_entities "github.com/zsmartex/finex/controllers/admin_controllers/entities"
 	api_entities "github.com/zsmartex/finex/controllers/entities"
 	"github.com/zsmartex/finex/types"
-	"github.com/zsmartex/pkg/order"
+	"github.com/zsmartex/pkg"
 	"gorm.io/gorm"
 )
 
@@ -148,7 +148,7 @@ func (t *Trade) WriteToInflux() {
 	config.InfluxDB.NewPoint("trades", tags, fields)
 }
 
-func (t *Trade) RecordCompleteOperations(seller_matching_order, buyer_matching_order order.Order, tx *gorm.DB) error {
+func (t *Trade) RecordCompleteOperations(seller_matching_order, buyer_matching_order pkg.Order, tx *gorm.DB) error {
 	var seller_order *Order
 	var buyer_order *Order
 

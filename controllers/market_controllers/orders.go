@@ -1,7 +1,6 @@
 package market_controllers
 
 import (
-	"encoding/json"
 	"errors"
 	"strconv"
 	"time"
@@ -180,11 +179,10 @@ func CancelOrderByUUID(c *fiber.Ctx) error {
 	}
 
 	// Doing cancel
-	payload_matching_attrs, _ := json.Marshal(map[string]interface{}{
+	config.KafkaProducer.Produce("matching", map[string]interface{}{
 		"action": pkg.ActionCancel,
 		"order":  order.ToMatchingAttributes(),
 	})
-	config.Kafka.Publish("matching", payload_matching_attrs)
 
 	return c.Status(200).JSON(order.ToJSON())
 }
@@ -227,11 +225,10 @@ func CancelAllOrders(c *fiber.Ctx) error {
 
 	for _, order := range orders {
 		// Doing cancel
-		payload_matching_attrs, _ := json.Marshal(map[string]interface{}{
+		config.KafkaProducer.Produce("matching", map[string]interface{}{
 			"action": pkg.ActionCancel,
 			"order":  order.ToMatchingAttributes(),
 		})
-		config.Kafka.Publish("matching", payload_matching_attrs)
 	}
 
 	var ordersJSON []entities.OrderEntity
