@@ -1,6 +1,7 @@
 package models
 
 import (
+	"strings"
 	"time"
 
 	"github.com/shopspring/decimal"
@@ -28,7 +29,7 @@ type Market struct {
 }
 
 func (m *Market) GetSymbol() pkg.Symbol {
-	return pkg.Symbol{BaseCurrency: m.BaseUnit, QuoteCurrency: m.QuoteUnit}
+	return pkg.Symbol{BaseCurrency: strings.ToUpper(m.BaseUnit), QuoteCurrency: strings.ToUpper(m.QuoteUnit)}
 }
 
 func (m Market) round_price(val decimal.Decimal) decimal.Decimal {

@@ -10,6 +10,7 @@ import (
 	"github.com/emirpasic/gods/trees/redblacktree"
 	GrpcEngine "github.com/zsmartex/pkg/Grpc/engine"
 	GrpcOrder "github.com/zsmartex/pkg/Grpc/order"
+	GrpcSymbol "github.com/zsmartex/pkg/Grpc/symbol"
 	GrpcUtils "github.com/zsmartex/pkg/Grpc/utils"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
@@ -110,7 +111,7 @@ func (s *EngineServer) CancelOrder(order *pkg.Order) error {
 	return nil
 }
 
-func (s EngineServer) GetEngineByMarket(symbol pkg.Symbol) *matching.Engine {
+func (s EngineServer) GetEngineBySymbol(symbol pkg.Symbol) *matching.Engine {
 	engine, found := s.Engines[symbol]
 
 	if found {
@@ -122,7 +123,7 @@ func (s EngineServer) GetEngineByMarket(symbol pkg.Symbol) *matching.Engine {
 
 func (s *EngineServer) FetchOrder(ctx context.Context, req *GrpcEngine.FetchOrderRequest) (*GrpcEngine.FetchOrderResponse, error) {
 	key := req.OrderKey.ToOrderKey()
-	engine := s.GetEngineByMarket(key.Symbol)
+	engine := s.GetEngineBySymbol(key.Symbol)
 	pl := matching.NewPriceLevel(key.Side, key.Price)
 
 	var price_levels *redblacktree.Tree
@@ -145,7 +146,7 @@ func (s *EngineServer) FetchOrder(ctx context.Context, req *GrpcEngine.FetchOrde
 			Id:       order.ID,
 			Uuid:     order.UUID[:],
 			MemberId: order.MemberID,
-			Symbol:   order.Symbol,
+			Symbol:   &GrpcSymbol.Symbol{BaseCurrency: order.Symbol.BaseCurrency, QuoteCurrency: order.Symbol.QuoteCurrency},
 			Side:     string(order.Side),
 			Type:     string(order.Type),
 			Price: &GrpcUtils.Decimal{
@@ -172,7 +173,7 @@ func (s *EngineServer) FetchOrder(ctx context.Context, req *GrpcEngine.FetchOrde
 }
 
 func (s *EngineServer) FetchMarketPrice(ctx context.Context, req *GrpcEngine.FetchMarketPriceRequest) (*GrpcEngine.FetchMarketPriceResponse, error) {
-	engine := s.GetEngineByMarket(req.Symbol)
+	engine := s.GetEngineBySymbol(req.Symbol.ToSymbol())
 	price := engine.OrderBook.MarketPrice
 
 	return &GrpcEngine.FetchMarketPriceResponse{
@@ -184,14 +185,14 @@ func (s *EngineServer) FetchMarketPrice(ctx context.Context, req *GrpcEngine.Fet
 }
 
 func (s *EngineServer) FetchOrderBook(ctx context.Context, req *GrpcEngine.FetchOrderBookRequest) (*GrpcEngine.FetchOrderBookResponse, error) {
-	engine := s.GetEngineByMarket(req.Symbol)
+	engine := s.GetEngineBySymbol(req.Symbol.ToSymbol())
 	response := engine.OrderBook.Depth.FetchOrderBook(req.Limit)
 
 	return response, nil
 }
 
 func (s *EngineServer) CalcMarketOrder(ctx context.Context, req *GrpcEngine.CalcMarketOrderRequest) (*GrpcEngine.CalcMarketOrderResponse, error) {
-	engine := s.GetEngineByMarket(req.Symbol)
+	engine := s.GetEngineBySymbol(req.Symbol.ToSymbol())
 	response := engine.OrderBook.CalcMarketOrder(pkg.OrderSide(req.Side), req.Quantity.ToNullDecimal(), req.Volume.ToNullDecimal())
 
 	return response, nil
@@ -211,9 +212,8 @@ func (s *EngineServer) Reload(symbol pkg.Symbol) {
 }
 
 func (s *EngineServer) InitializeEngine(symbol pkg.Symbol) {
-	config.Logger.Infof("%v engine reloading.", symbol.String())
 	lastPrice := decimal.Zero
-	trade := models.GetLastTradeFromInflux(symbol)
+	trade := models.GetLastTradeFromInflux(strings.ToLower(symbol.ToSymbol("")))
 	if trade != nil {
 		lastPrice = trade.Price
 	}

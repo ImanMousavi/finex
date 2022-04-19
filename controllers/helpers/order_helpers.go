@@ -6,6 +6,7 @@ import (
 
 	"github.com/zsmartex/pkg"
 	GrpcEngine "github.com/zsmartex/pkg/Grpc/engine"
+	GrpcSymbol "github.com/zsmartex/pkg/Grpc/symbol"
 	GrpcUtils "github.com/zsmartex/pkg/Grpc/utils"
 	clientEngine "github.com/zsmartex/pkg/client/engine"
 
@@ -112,8 +113,10 @@ func (p CreateOrderParams) BuildOrder(member *models.Member, err_src *Errors) *m
 		matching_client := clientEngine.NewMatchingClient()
 		defer matching_client.Close()
 
+		symbol := market.GetSymbol()
+
 		calc_market_order_response, err := matching_client.CalcMarketOrder(&GrpcEngine.CalcMarketOrderRequest{
-			Symbol: market.Symbol,
+			Symbol: &GrpcSymbol.Symbol{BaseCurrency: symbol.BaseCurrency, QuoteCurrency: symbol.QuoteCurrency},
 			Side:   string(side),
 			Quantity: &GrpcUtils.Decimal{
 				Val: p.Quantity.Decimal.CoefficientInt64(),

@@ -541,7 +541,7 @@ func (o *Order) ToMatchingAttributes() *pkg.Order {
 	return &pkg.Order{
 		ID:             o.ID,
 		UUID:           o.UUID,
-		Symbol:         pkg.Symbol{BaseCurrency: market.BaseUnit, QuoteCurrency: market.QuoteUnit},
+		Symbol:         market.GetSymbol(),
 		MemberID:       o.MemberID,
 		Side:           side,
 		Type:           orderType,

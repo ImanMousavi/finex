@@ -1,11 +1,13 @@
 package controllers
 
 import (
+	"errors"
 	"log"
 	"time"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/shopspring/decimal"
+	"gorm.io/gorm"
 
 	"github.com/zsmartex/pkg"
 	clientEngine "github.com/zsmartex/pkg/client/engine"
@@ -17,6 +19,7 @@ import (
 	"github.com/zsmartex/finex/models"
 	"github.com/zsmartex/finex/types"
 	engineGrpc "github.com/zsmartex/pkg/Grpc/engine"
+	GrpcSymbol "github.com/zsmartex/pkg/Grpc/symbol"
 )
 
 func IEOToEntity(ieo *models.IEO) *entities.IEO {
@@ -81,9 +84,9 @@ func GetIEO(c *fiber.Ctx) error {
 }
 
 func GetDepth(c *fiber.Ctx) error {
-	var errors = new(helpers.Errors)
+	var errs = new(helpers.Errors)
 
-	market := c.Params("market")
+	marketID := c.Params("market")
 	params := new(queries.DepthQuery)
 	if err := c.QueryParser(params); err != nil {
 		return c.Status(500).JSON(helpers.Errors{
@@ -91,10 +94,17 @@ func GetDepth(c *fiber.Ctx) error {
 		})
 	}
 
-	helpers.Vaildate(params, errors)
+	helpers.Vaildate(params, errs)
 
-	if errors.Size() > 0 {
-		return c.Status(422).JSON(errors)
+	if errs.Size() > 0 {
+		return c.Status(422).JSON(errs)
+	}
+
+	var market *models.Market
+	if result := config.DataBase.First(&market, "symbol = ?", marketID); errors.Is(result.Error, gorm.ErrRecordNotFound) {
+		return c.Status(422).JSON(helpers.Errors{
+			Errors: []string{"public.market.doesnt_exist"},
+		})
 	}
 
 	matching_client := clientEngine.NewMatchingClient()
@@ -109,13 +119,14 @@ func GetDepth(c *fiber.Ctx) error {
 		Bids:     [][]decimal.Decimal{},
 		Sequence: 0,
 	}
-
+	symbol := market.GetSymbol()
 	fetch_orderbook_response, err := matching_client.FetchOrderBook(&engineGrpc.FetchOrderBookRequest{
-		Symbol: market,
+		Symbol: &GrpcSymbol.Symbol{BaseCurrency: symbol.BaseCurrency, QuoteCurrency: symbol.QuoteCurrency},
 		Limit:  params.Limit,
 	})
 	if err != nil {
 		log.Println(err)
+		config.Logger.Errorf("Failed to fetch %s depth, Error: %v", symbol.String(), err)
 
 		return c.Status(200).JSON(depth)
 	}
@@ -143,12 +154,11 @@ func GetGlobalPrice(c *fiber.Ctx) error {
 	var global_price types.GlobalPrice
 
 	if err := config.Redis.GetKey("finex:h24:global_price", &global_price); err != nil {
-		config.Logger.Errorf("Error %v", err.Error())
-		c.Status(422).JSON(helpers.Errors{
+		config.Logger.Errorf("Failed to fetch global price %v", err)
+
+		return c.Status(422).JSON(helpers.Errors{
 			Errors: []string{"public.global_price.failed"},
 		})
-
-		return err
 	}
 
 	return c.Status(200).JSON(global_price)

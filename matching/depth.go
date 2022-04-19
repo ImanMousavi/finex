@@ -11,6 +11,7 @@ import (
 	"github.com/zsmartex/finex/config"
 	"github.com/zsmartex/pkg"
 	GrpcEngine "github.com/zsmartex/pkg/Grpc/engine"
+	GrpcSymbol "github.com/zsmartex/pkg/Grpc/symbol"
 	GrpcUtils "github.com/zsmartex/pkg/Grpc/utils"
 )
 
@@ -101,7 +102,7 @@ func (d *Depth) FetchOrderBook(limit int64) *GrpcEngine.FetchOrderBookResponse {
 	defer d.depthMutex.Unlock()
 
 	result := &GrpcEngine.FetchOrderBookResponse{
-		Symbol:   d.Symbol,
+		Symbol:   &GrpcSymbol.Symbol{BaseCurrency: d.Symbol.BaseCurrency, QuoteCurrency: d.Symbol.QuoteCurrency},
 		Asks:     make([]*GrpcEngine.BookOrder, 0),
 		Bids:     make([]*GrpcEngine.BookOrder, 0),
 		Sequence: d.Notification.Sequence,

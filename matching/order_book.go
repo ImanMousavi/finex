@@ -14,6 +14,7 @@ import (
 	GrpcEngine "github.com/zsmartex/pkg/Grpc/engine"
 	GrpcOrder "github.com/zsmartex/pkg/Grpc/order"
 	GrpcQuantex "github.com/zsmartex/pkg/Grpc/quantex"
+	GrpcSymbol "github.com/zsmartex/pkg/Grpc/symbol"
 	GrpcUtils "github.com/zsmartex/pkg/Grpc/utils"
 	clientQuantex "github.com/zsmartex/pkg/client/quantex"
 )
@@ -332,7 +333,7 @@ func (ob *OrderBook) Match(order *pkg.Order) {
 					Id:       counter_order.ID,
 					Uuid:     counter_order.UUID[:],
 					MemberId: counter_order.MemberID,
-					Symbol:   counter_order.Symbol,
+					Symbol:   &GrpcSymbol.Symbol{BaseCurrency: counter_order.Symbol.BaseCurrency, QuoteCurrency: counter_order.Symbol.QuoteCurrency},
 					Side:     string(counter_order.Side),
 					Type:     string(counter_order.Type),
 					Price: &GrpcUtils.Decimal{
@@ -380,7 +381,7 @@ func (ob *OrderBook) Match(order *pkg.Order) {
 					Id:       order.ID,
 					Uuid:     order.UUID[:],
 					MemberId: order.MemberID,
-					Symbol:   order.Symbol,
+					Symbol:   &GrpcSymbol.Symbol{BaseCurrency: order.Symbol.BaseCurrency, QuoteCurrency: order.Symbol.QuoteCurrency},
 					Side:     string(order.Side),
 					Type:     string(order.Type),
 					Price: &GrpcUtils.Decimal{
