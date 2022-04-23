@@ -18,7 +18,7 @@ var Referral *types.Referral
 
 func InitializeConfig() error {
 	Logger = services.NewLoggerService("Finex")
-	db, err := services.NewDatabase()
+	db, err := NewDatabase()
 	if err != nil {
 		return err
 	}
