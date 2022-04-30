@@ -1,7 +1,6 @@
 package controllers
 
 import (
-	"encoding/json"
 	"errors"
 	"log"
 	"time"
@@ -152,8 +151,6 @@ func GetDepth(c *fiber.Ctx) error {
 }
 
 func GetGlobalPrice(c *fiber.Ctx) error {
-	var global_price types.GlobalPrice
-
 	result, err := config.Redis.Get("finex:h24:global_price")
 	if err != nil {
 		config.Logger.Errorf("Failed to fetch global price %v", err)
@@ -163,7 +160,5 @@ func GetGlobalPrice(c *fiber.Ctx) error {
 		})
 	}
 
-	json.Unmarshal([]byte(result.Val()), &global_price)
-
-	return c.Status(200).JSON(global_price)
+	return c.Status(200).JSON(result.Val())
 }
