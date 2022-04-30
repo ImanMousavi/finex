@@ -222,12 +222,8 @@ func SubmitOrder(id int64) error {
 		order.RecordSubmitOperations()
 
 		order.State = StateWait
-		tx.Save(order)
 
-		config.KafkaProducer.Produce("matching", map[string]interface{}{
-			"action": pkg.ActionSubmit,
-			"order":  order.ToMatchingAttributes(),
-		})
+		tx.Update("state", order.State)
 
 		return nil
 	})
@@ -241,6 +237,13 @@ func SubmitOrder(id int64) error {
 
 		order.State = StateReject
 		config.DataBase.Save(&order)
+	}
+
+	if err == nil {
+		config.KafkaProducer.Produce("matching", map[string]interface{}{
+			"action": pkg.ActionSubmit,
+			"order":  order.ToMatchingAttributes(),
+		})
 	}
 
 	return nil
