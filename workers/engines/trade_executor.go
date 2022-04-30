@@ -127,11 +127,13 @@ func (t *TradeExecutor) CreateTradeAndStrikeOrders() (*models.Trade, error) {
 	err := config.DataBase.Transaction(func(tx *gorm.DB) error {
 		var accounts []*models.Account
 		var market *models.Market
+		config.Logger.Info("1")
 		accounts_table := make(map[string]*models.Account)
 
 		if result := config.DataBase.First(&market, "symbol = ?", t.TradePayload.Symbol); result.Error != nil {
 			return result.Error
 		}
+		config.Logger.Info("2")
 
 		if !t.IsMakerOrderFake() {
 			if result := tx.Clauses(clause.Locking{
@@ -149,10 +151,12 @@ func (t *TradeExecutor) CreateTradeAndStrikeOrders() (*models.Trade, error) {
 				return result.Error
 			}
 		}
+		config.Logger.Info("3")
 
 		if err := t.VaildateTrade(); err != nil {
 			return err
 		}
+		config.Logger.Info("4")
 
 		// Check if accounts exists or create them.
 		if !t.IsMakerOrderFake() {
@@ -170,9 +174,10 @@ func (t *TradeExecutor) CreateTradeAndStrikeOrders() (*models.Trade, error) {
 				CurrencyID: t.TakerOrder.IncomeCurrency().ID,
 			})
 		}
+		config.Logger.Info("5")
 
-		config.Logger.Println("BaseUnit:", market.BaseUnit)
-		config.Logger.Println("QuoteUnit:", market.QuoteUnit)
+		config.Logger.Info("BaseUnit:", market.BaseUnit)
+		config.Logger.Info("QuoteUnit:", market.QuoteUnit)
 
 		tx.Clauses(clause.Locking{
 			Strength: "UPDATE",
