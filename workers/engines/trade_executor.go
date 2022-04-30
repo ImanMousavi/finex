@@ -132,16 +132,20 @@ func (t *TradeExecutor) CreateTradeAndStrikeOrders() (*models.Trade, error) {
 		config.DataBase.First(&market, "symbol = ?", t.TradePayload.Symbol)
 
 		if !t.IsMakerOrderFake() {
-			tx.Clauses(clause.Locking{
+			if result := tx.Clauses(clause.Locking{
 				Strength: "UPDATE",
 				Table:    clause.Table{Name: "orders"},
-			}).Where("id = ?", t.TradePayload.MakerOrder.ID).First(t.MakerOrder)
+			}).Where("id = ?", t.TradePayload.MakerOrder.ID).First(&t.MakerOrder); result.Error != nil {
+				return result.Error
+			}
 		}
 		if !t.IsTakerOrderFake() {
-			tx.Clauses(clause.Locking{
+			if result := tx.Clauses(clause.Locking{
 				Strength: "UPDATE",
 				Table:    clause.Table{Name: "orders"},
-			}).Where("id = ?", t.TradePayload.TakerOrder.ID).First(t.TakerOrder)
+			}).Where("id = ?", t.TradePayload.TakerOrder.ID).First(&t.TakerOrder); result.Error != nil {
+				return result.Error
+			}
 		}
 
 		if err := t.VaildateTrade(); err != nil {
