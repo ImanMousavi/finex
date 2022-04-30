@@ -2,6 +2,8 @@ package config
 
 import (
 	"io/ioutil"
+	"os"
+	"strings"
 
 	"github.com/sirupsen/logrus"
 	"github.com/zsmartex/finex/types"
@@ -24,7 +26,7 @@ func InitializeConfig() error {
 	}
 
 	DataBase = db
-	KafkaProducer, err = services.NewKafkaProducer(Logger)
+	KafkaProducer, err = services.NewKafkaProducer(strings.Split(os.Getenv("KAFKA_URL"), ","), Logger)
 	if err != nil {
 		return err
 	}

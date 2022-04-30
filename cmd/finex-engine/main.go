@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/zsmartex/finex/config"
 	"github.com/zsmartex/finex/workers/engines"
@@ -32,7 +33,7 @@ func main() {
 
 	ARVG := os.Args[1:]
 	id := ARVG[0]
-	consumer, err := services.NewKafkaConsumer("zsmartex", []string{id})
+	consumer, err := services.NewKafkaConsumer(strings.Split(os.Getenv("KAFKA_URL"), ""), "zsmartex", []string{id})
 	if err != nil {
 		panic(err)
 	}
