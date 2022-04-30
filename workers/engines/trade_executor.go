@@ -130,7 +130,7 @@ func (t *TradeExecutor) CreateTradeAndStrikeOrders() (*models.Trade, error) {
 		config.Logger.Info("1")
 		accounts_table := make(map[string]*models.Account)
 
-		if result := config.DataBase.First(&market, "symbol = ?", t.TradePayload.Symbol); result.Error != nil {
+		if result := config.DataBase.First(&market, "symbol = ?", strings.ToLower(t.TradePayload.Symbol.ToSymbol(""))); result.Error != nil {
 			return result.Error
 		}
 		config.Logger.Info("2")
