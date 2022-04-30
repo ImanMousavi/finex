@@ -223,7 +223,7 @@ func SubmitOrder(id int64) error {
 
 		order.State = StateWait
 
-		tx.Update("state", order.State)
+		tx.Save(&order)
 
 		return nil
 	})
