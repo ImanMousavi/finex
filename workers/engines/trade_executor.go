@@ -183,13 +183,7 @@ func (t *TradeExecutor) CreateTradeAndStrikeOrders() (*models.Trade, error) {
 				t.TradePayload.TakerOrder.MemberID,
 				t.TradePayload.MakerOrder.MemberID,
 			},
-		).Where(
-			"currency_id IN ?",
-			[]string{
-				market.BaseUnit,
-				market.QuoteUnit,
-			},
-		).Find(&accounts)
+		).Where(fmt.Sprintf("currency_id IN ('%s', '%s')", market.BaseUnit, market.QuoteUnit)).Find(&accounts)
 
 		for _, account := range accounts {
 			accounts_table[account.CurrencyID+":"+strconv.FormatInt(account.MemberID, 10)] = account
