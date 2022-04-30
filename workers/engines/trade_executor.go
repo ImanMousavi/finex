@@ -129,7 +129,9 @@ func (t *TradeExecutor) CreateTradeAndStrikeOrders() (*models.Trade, error) {
 		var market *models.Market
 		accounts_table := make(map[string]*models.Account)
 
-		config.DataBase.First(&market, "symbol = ?", t.TradePayload.Symbol)
+		if result := config.DataBase.First(&market, "symbol = ?", t.TradePayload.Symbol); result.Error != nil {
+			return result.Error
+		}
 
 		if !t.IsMakerOrderFake() {
 			if result := tx.Clauses(clause.Locking{
@@ -188,8 +190,12 @@ func (t *TradeExecutor) CreateTradeAndStrikeOrders() (*models.Trade, error) {
 			accounts_table[account.CurrencyID+":"+strconv.FormatInt(account.MemberID, 10)] = account
 		}
 
+		config.Logger.Println("t.TradePayload.TakerOrder.MemberID:", t.TradePayload.TakerOrder.MemberID)
+		config.Logger.Println("t.TradePayload.MakerOrder.MemberID:", t.TradePayload.MakerOrder.MemberID)
 		config.Logger.Println("accounts_table:", accounts_table)
 		config.Logger.Println("accounts:", accounts)
+		config.Logger.Println("BaseUnit:", market.BaseUnit)
+		config.Logger.Println("QuoteUnit:", market.QuoteUnit)
 
 		var side types.TakerType
 		if t.TradePayload.TakerOrder.Side == pkg.SideSell {
