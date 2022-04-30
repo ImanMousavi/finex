@@ -188,6 +188,9 @@ func (t *TradeExecutor) CreateTradeAndStrikeOrders() (*models.Trade, error) {
 			accounts_table[account.CurrencyID+":"+strconv.FormatInt(account.MemberID, 10)] = account
 		}
 
+		config.Logger.Println("accounts_table:", accounts_table)
+		config.Logger.Println("accounts:", accounts)
+
 		var side types.TakerType
 		if t.TradePayload.TakerOrder.Side == pkg.SideSell {
 			side = types.TypeSell
