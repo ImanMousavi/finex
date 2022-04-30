@@ -162,7 +162,7 @@ func GetGlobalPrice(c *fiber.Ctx) error {
 		})
 	}
 
-	var global_price *types.GlobalPrice
+	global_price := make(types.GlobalPrice)
 	if err := json.Unmarshal([]byte(result.Val()), &global_price); err != nil {
 		config.Logger.Errorf("Failed to fetch global price %v", err)
 
