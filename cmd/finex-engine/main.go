@@ -33,7 +33,7 @@ func main() {
 
 	ARVG := os.Args[1:]
 	id := ARVG[0]
-	consumer, err := services.NewKafkaConsumer(strings.Split(os.Getenv("KAFKA_URL"), ""), "zsmartex", []string{id})
+	consumer, err := services.NewKafkaConsumer(strings.Split(os.Getenv("KAFKA_URL"), ","), "zsmartex", []string{id})
 	if err != nil {
 		panic(err)
 	}

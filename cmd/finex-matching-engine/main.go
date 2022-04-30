@@ -24,7 +24,7 @@ func main() {
 	server := engine.NewEngineServer()
 	grpcServer := grpc.NewServer()
 
-	consumer, err := services.NewKafkaConsumer(strings.Split(os.Getenv("KAFKA_URL"), ""), "zsmartex", []string{"matching"})
+	consumer, err := services.NewKafkaConsumer(strings.Split(os.Getenv("KAFKA_URL"), ","), "zsmartex", []string{"matching"})
 	if err != nil {
 		panic(err)
 	}
