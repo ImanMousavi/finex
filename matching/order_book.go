@@ -357,16 +357,16 @@ func (ob *OrderBook) Match(order *pkg.Order) {
 					CreatedAt: timestamppb.New(counter_order.CreatedAt),
 				},
 			})
-
-			trade := &pkg.Trade{
-				Symbol:   ob.Symbol,
-				Price:    counter_order.Price,
-				Quantity: quantity,
-				Total:    counter_order.Price.Mul(quantity),
-			}
-
-			ob.PublishTrade(order, counter_order, trade)
 		}
+
+		trade := &pkg.Trade{
+			Symbol:   ob.Symbol,
+			Price:    counter_order.Price,
+			Quantity: quantity,
+			Total:    counter_order.Price.Mul(quantity),
+		}
+
+		ob.PublishTrade(order, counter_order, trade)
 
 		if order.Filled() {
 			return
