@@ -5,7 +5,7 @@ go 1.18
 require (
 	github.com/cbrake/influxdbhelper/v2 v2.1.4
 	github.com/dgrijalva/jwt-go v3.2.0+incompatible
-	github.com/emirpasic/gods v1.12.0
+	github.com/emirpasic/gods v1.18.1
 	github.com/gofiber/fiber/v2 v2.32.0
 	github.com/google/uuid v1.3.0
 	github.com/gookit/validate v1.2.11
