@@ -97,10 +97,13 @@ func (p *PriceLevel) Total() decimal.Decimal {
 	return total
 }
 
-func (p *PriceLevel) Remove(key *pkg.OrderKey) {
+func (p *PriceLevel) Remove(key *pkg.OrderKey) decimal.Decimal {
+	total := p.Total()
+
 	p.Lock()
 	defer p.Unlock()
-	index, _ := p.Orders.Find(func(index int, value interface{}) bool {
+
+	index, order := p.Orders.Find(func(index int, value interface{}) bool {
 		order := value.(*pkg.Order)
 
 		return order.UUID == key.UUID
@@ -109,6 +112,8 @@ func (p *PriceLevel) Remove(key *pkg.OrderKey) {
 	if index >= 0 {
 		p.Orders.Remove(index)
 	}
+
+	return total.Sub(order.(*pkg.Order).UnfilledQuantity())
 }
 
 func OrderComparator(a, b interface{}) int {

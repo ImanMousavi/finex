@@ -89,13 +89,13 @@ func (d *Depth) Remove(key *pkg.OrderKey) {
 	}
 
 	price_level := value.(*PriceLevel)
-	price_level.Remove(key)
+	remain_quantity := price_level.Remove(key)
 
-	if price_level.Empty() || price_level.Total().IsZero() {
+	if price_level.Empty() || remain_quantity.IsZero() {
 		price_levels.Remove(pl.Key())
 	}
 
-	d.Notification.Publish(pl.Side, pl.Price, pl.Total())
+	d.Notification.Publish(pl.Side, pl.Price, remain_quantity)
 }
 
 func (d *Depth) FetchOrderBook(limit int64) *GrpcEngine.FetchOrderBookResponse {
