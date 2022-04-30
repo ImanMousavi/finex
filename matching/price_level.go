@@ -85,12 +85,15 @@ func (p *PriceLevel) Size() int {
 func (p *PriceLevel) Total() decimal.Decimal {
 	p.Lock()
 	defer p.Unlock()
-	total := decimal.Zero
-	p.Orders.Each(func(index int, value interface{}) {
-		order := value.(*pkg.Order)
 
+	total := decimal.Zero
+	iterator := p.Orders.Iterator()
+
+	for iterator.Next() {
+		order := iterator.Value().(*pkg.Order)
 		total = total.Add(order.UnfilledQuantity())
-	})
+	}
+
 	return total
 }
 
