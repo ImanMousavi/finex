@@ -1,6 +1,7 @@
 package matching
 
 import (
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -38,7 +39,7 @@ func NewNotification(symbol pkg.Symbol) *Notification {
 		panic(err)
 	}
 
-	sq, err := result.Int64()
+	sq, err := strconv.ParseInt(result.Val(), 10, 64)
 	if err != nil {
 		panic(err)
 	}
