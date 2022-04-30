@@ -127,7 +127,7 @@ func (t *TradeExecutor) CreateTradeAndStrikeOrders() (*models.Trade, error) {
 	err := config.DataBase.Transaction(func(tx *gorm.DB) error {
 		var accounts []*models.Account
 		var market *models.Market
-		config.Logger.Info("1")
+		config.Logger.Info("1", strings.ToLower(t.TradePayload.Symbol.ToSymbol("")))
 		accounts_table := make(map[string]*models.Account)
 
 		if result := config.DataBase.First(&market, "symbol = ?", strings.ToLower(t.TradePayload.Symbol.ToSymbol(""))); result.Error != nil {
