@@ -153,7 +153,7 @@ func GetDepth(c *fiber.Ctx) error {
 func GetGlobalPrice(c *fiber.Ctx) error {
 	var global_price types.GlobalPrice
 
-	if err := config.Redis.GetKey("finex:h24:global_price", &global_price); err != nil {
+	if err := config.Redis.GetKey("finex:h24:global_price", global_price); err != nil {
 		config.Logger.Errorf("Failed to fetch global price %v", err)
 
 		return c.Status(422).JSON(helpers.Errors{
