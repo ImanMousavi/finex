@@ -171,15 +171,20 @@ func (t *TradeExecutor) CreateTradeAndStrikeOrders() (*models.Trade, error) {
 			})
 		}
 
+		config.Logger.Println("BaseUnit:", market.BaseUnit)
+		config.Logger.Println("QuoteUnit:", market.QuoteUnit)
+
 		tx.Clauses(clause.Locking{
 			Strength: "UPDATE",
 			Table:    clause.Table{Name: "accounts"},
 		}).Where(
-			"member_id IN ? AND currency_id IN ?",
+			"member_id IN ?",
 			[]int64{
 				t.TradePayload.TakerOrder.MemberID,
 				t.TradePayload.MakerOrder.MemberID,
 			},
+		).Where(
+			"currency_id IN ?",
 			[]string{
 				market.BaseUnit,
 				market.QuoteUnit,
@@ -194,8 +199,6 @@ func (t *TradeExecutor) CreateTradeAndStrikeOrders() (*models.Trade, error) {
 		config.Logger.Println("t.TradePayload.MakerOrder.MemberID:", t.TradePayload.MakerOrder.MemberID)
 		config.Logger.Println("accounts_table:", accounts_table)
 		config.Logger.Println("accounts:", accounts)
-		config.Logger.Println("BaseUnit:", market.BaseUnit)
-		config.Logger.Println("QuoteUnit:", market.QuoteUnit)
 
 		var side types.TakerType
 		if t.TradePayload.TakerOrder.Side == pkg.SideSell {
