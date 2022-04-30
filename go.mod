@@ -14,7 +14,7 @@ require (
 	github.com/shopspring/decimal v1.3.1
 	github.com/sirupsen/logrus v1.8.1
 	github.com/volatiletech/null v8.0.0+incompatible
-	github.com/zsmartex/pkg v1.3.48
+	github.com/zsmartex/pkg v1.3.49
 	google.golang.org/grpc v1.45.0
 	google.golang.org/protobuf v1.27.1
 	gopkg.in/yaml.v2 v2.4.0
