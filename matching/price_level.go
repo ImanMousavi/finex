@@ -111,9 +111,11 @@ func (p *PriceLevel) Remove(key *pkg.OrderKey) decimal.Decimal {
 
 	if index >= 0 {
 		p.Orders.Remove(index)
+
+		return total.Sub(order.(*pkg.Order).UnfilledQuantity())
 	}
 
-	return total.Sub(order.(*pkg.Order).UnfilledQuantity())
+	return total
 }
 
 func OrderComparator(a, b interface{}) int {
