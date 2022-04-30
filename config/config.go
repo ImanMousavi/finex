@@ -17,6 +17,7 @@ var Logger *logrus.Entry
 var KafkaProducer *services.KafkaProducer
 var RangoClient *services.RangoClient
 var Referral *types.Referral
+var Redis *services.RedisClient
 
 func InitializeConfig() error {
 	Logger = services.NewLoggerService("Finex")
@@ -36,9 +37,11 @@ func InitializeConfig() error {
 		return err
 	}
 
-	if err := NewCacheService(); err != nil {
+	Redis, err = services.NewRedisClient(os.Getenv("REDIS_URL"))
+	if err != nil {
 		return err
 	}
+
 	if err := NewInfluxDB(); err != nil {
 		return err
 	}

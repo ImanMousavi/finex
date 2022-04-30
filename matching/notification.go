@@ -33,7 +33,17 @@ func NewNotification(symbol pkg.Symbol) *Notification {
 		},
 	}
 
-	config.Redis.GetKey("finex:"+strings.ToLower(symbol.ToSymbol(""))+":depth:sequence", &notification.Sequence)
+	result, err := config.Redis.Get("finex:" + strings.ToLower(symbol.ToSymbol("")) + ":depth:sequence")
+	if err != nil {
+		panic(err)
+	}
+
+	sq, err := result.Int64()
+	if err != nil {
+		panic(err)
+	}
+
+	notification.Sequence = sq
 
 	notification.Start()
 
@@ -55,7 +65,7 @@ func (n *Notification) StartLoop() {
 		n.NotifyMutex.Lock()
 
 		n.Sequence++
-		config.Redis.SetKey("finex:"+strings.ToLower(n.Symbol.ToSymbol(""))+":depth:sequence", n.Sequence, 0)
+		config.Redis.Set("finex:"+strings.ToLower(n.Symbol.ToSymbol(""))+":depth:sequence", n.Sequence, 0)
 
 		asks_depth := make([][]decimal.Decimal, 0)
 		bids_depth := make([][]decimal.Decimal, 0)

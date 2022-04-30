@@ -32,7 +32,10 @@ func (j *GlobalPriceJob) Process() {
 		return
 	}
 
-	config.Redis.SetKey("finex:h24:global_price", global_price, 10*time.Minute)
+	if err := config.Redis.Set("finex:h24:global_price", string(body), 10*time.Minute); err != nil {
+		config.Logger.Error(err.Error())
+		return
+	}
 
 	time.Sleep(10 * time.Minute)
 }
