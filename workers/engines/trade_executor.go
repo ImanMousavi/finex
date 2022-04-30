@@ -127,13 +127,11 @@ func (t *TradeExecutor) CreateTradeAndStrikeOrders() (*models.Trade, error) {
 	err := config.DataBase.Transaction(func(tx *gorm.DB) error {
 		var accounts []*models.Account
 		var market *models.Market
-		config.Logger.Info("1", strings.ToLower(t.TradePayload.Symbol.ToSymbol("")))
 		accounts_table := make(map[string]*models.Account)
 
 		if result := config.DataBase.First(&market, "symbol = ?", strings.ToLower(t.TradePayload.Symbol.ToSymbol(""))); result.Error != nil {
 			return result.Error
 		}
-		config.Logger.Info("2")
 
 		if !t.IsMakerOrderFake() {
 			if result := tx.Clauses(clause.Locking{
@@ -156,7 +154,6 @@ func (t *TradeExecutor) CreateTradeAndStrikeOrders() (*models.Trade, error) {
 		if err := t.VaildateTrade(); err != nil {
 			return err
 		}
-		config.Logger.Info("4")
 
 		// Check if accounts exists or create them.
 		if !t.IsMakerOrderFake() {
@@ -183,21 +180,14 @@ func (t *TradeExecutor) CreateTradeAndStrikeOrders() (*models.Trade, error) {
 			Strength: "UPDATE",
 			Table:    clause.Table{Name: "accounts"},
 		}).Where(
-			"member_id IN ?",
-			[]int64{
-				t.TradePayload.TakerOrder.MemberID,
-				t.TradePayload.MakerOrder.MemberID,
-			},
-		).Where(fmt.Sprintf("currency_id IN ('%s', '%s')", market.BaseUnit, market.QuoteUnit)).Find(&accounts)
+			"member_id IN ? AND currency_id IN ?",
+			[]int64{t.TradePayload.TakerOrder.MemberID, t.TradePayload.MakerOrder.MemberID},
+			[]string{market.BaseUnit, market.QuoteUnit},
+		).Find(&accounts)
 
 		for _, account := range accounts {
 			accounts_table[account.CurrencyID+":"+strconv.FormatInt(account.MemberID, 10)] = account
 		}
-
-		config.Logger.Println("t.TradePayload.TakerOrder.MemberID:", t.TradePayload.TakerOrder.MemberID)
-		config.Logger.Println("t.TradePayload.MakerOrder.MemberID:", t.TradePayload.MakerOrder.MemberID)
-		config.Logger.Println("accounts_table:", accounts_table)
-		config.Logger.Println("accounts:", accounts)
 
 		var side types.TakerType
 		if t.TradePayload.TakerOrder.Side == pkg.SideSell {

@@ -33,13 +33,18 @@ func main() {
 
 	go func() {
 		for {
+
 			records, err := consumer.Poll()
 			if err != nil {
 				config.Logger.Fatalf("Failed to poll consumer %v", err)
 			}
 
 			for _, record := range records {
-				config.Logger.Debugf("Recevie message: %s", string(record.Value))
+				if record.Topic != "matching" {
+					continue
+				}
+
+				config.Logger.Debugf("Recevie message from topic: %s payload: %s", record.Topic, string(record.Value))
 				err := server.Process(record.Value)
 
 				if err != nil {

@@ -50,6 +50,11 @@ func main() {
 		}
 
 		for _, record := range records {
+			if record.Topic != id {
+				continue
+			}
+
+			config.Logger.Debugf("Recevie message from topic: %s payload: %s", record.Topic, string(record.Value))
 			err := worker.Process(record.Value)
 
 			if err != nil {
