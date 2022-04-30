@@ -34,17 +34,20 @@ func NewNotification(symbol pkg.Symbol) *Notification {
 		},
 	}
 
-	result, err := config.Redis.Get("finex:" + strings.ToLower(symbol.ToSymbol("")) + ":depth:sequence")
-	if err != nil {
-		panic(err)
-	}
+	exist, _ := config.Redis.Exist("finex:" + strings.ToLower(symbol.ToSymbol("")) + ":depth:sequence")
+	if exist {
+		result, err := config.Redis.Get("finex:" + strings.ToLower(symbol.ToSymbol("")) + ":depth:sequence")
+		if err != nil {
+			panic(err)
+		}
 
-	sq, err := strconv.ParseInt(result.Val(), 10, 64)
-	if err != nil {
-		panic(err)
-	}
+		sq, err := strconv.ParseInt(result.Val(), 10, 64)
+		if err != nil {
+			panic(err)
+		}
 
-	notification.Sequence = sq
+		notification.Sequence = sq
+	}
 
 	notification.Start()
 
