@@ -328,7 +328,7 @@ func (ob *OrderBook) Match(order *pkg.Order) {
 		ob.setMarketPrice(counter_order.Price)
 
 		if counter_order.IsFake() {
-			ob.quantexClient.UpdateOrder(&GrpcQuantex.UpdateOrderRequest{
+			if _, err := ob.quantexClient.UpdateOrder(&GrpcQuantex.UpdateOrderRequest{
 				Order: &GrpcOrder.Order{
 					Id:       counter_order.ID,
 					Uuid:     counter_order.UUID[:],
@@ -356,7 +356,9 @@ func (ob *OrderBook) Match(order *pkg.Order) {
 					Cancelled: counter_order.Cancelled,
 					CreatedAt: timestamppb.New(counter_order.CreatedAt),
 				},
-			})
+			}); err != nil {
+				config.Logger.Errorf("[orderbook] update order %d failed: %s", counter_order.ID, err)
+			}
 		}
 
 		trade := &pkg.Trade{
@@ -376,7 +378,7 @@ func (ob *OrderBook) Match(order *pkg.Order) {
 	if order.UnfilledQuantity().IsPositive() && order.Type == pkg.TypeLimit {
 		ob.Depth.Add(order)
 		if order.IsFake() {
-			ob.quantexClient.UpdateOrder(&GrpcQuantex.UpdateOrderRequest{
+			if _, err := ob.quantexClient.UpdateOrder(&GrpcQuantex.UpdateOrderRequest{
 				Order: &GrpcOrder.Order{
 					Id:       order.ID,
 					Uuid:     order.UUID[:],
@@ -404,7 +406,9 @@ func (ob *OrderBook) Match(order *pkg.Order) {
 					Cancelled: order.Cancelled,
 					CreatedAt: timestamppb.New(order.CreatedAt),
 				},
-			})
+			}); err != nil {
+				config.Logger.Errorf("[orderbook] update order %d failed: %s", order.ID, err)
+			}
 		}
 	}
 }
