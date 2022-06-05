@@ -128,7 +128,7 @@ func CreateIEOOrder(c *fiber.Ctx) error {
 		config.Logger.Error(result.Error)
 		
 		return c.Status(500).JSON(helpers.Errors{
-			Errors: []string{"server.internal_error"}
+			Errors: []string{"server.internal_error"},
 		})
 	}
 
