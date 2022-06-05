@@ -124,7 +124,13 @@ func CreateIEOOrder(c *fiber.Ctx) error {
 		})
 	}
 
-	config.DataBase.Create(&ieo_order)
+	if result := config.DataBase.Create(&ieo_order); result.Error != nil {
+		config.Logger.Error(result.Error)
+		
+		return c.Status(500).JSON(helpers.Errors{
+			Errors: []string{"server.internal_error"}
+		})
+	}
 
 	config.KafkaProducer.Produce("ieo_order_processor", ieo_order.ToJSON())
 
