@@ -75,7 +75,7 @@ func (s *EngineServer) SubmitOrder(order *pkg.Order) error {
 
 	if order.Price.IsNegative() || order.StopPrice.IsNegative() {
 		config.Logger.Error("price is negative")
-		return
+		return nil
 	}
 
 	engine.Submit(order)
