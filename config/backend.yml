@@ -1,6 +1,20 @@
 version: '3.8'
 
 services:
+  db:
+    image: postgres
+    restart: always
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_PASSWORD: example
+
+  adminer:
+    image: adminer
+    restart: always
+    ports:
+      - 8089:8080
+
   auth:
     image: quay.io/openware/authz-dummy:0.1.1
     ports:
