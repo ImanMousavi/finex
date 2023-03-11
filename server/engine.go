@@ -141,6 +141,9 @@ func (s *EngineServer) FetchOrder(ctx context.Context, req *GrpcEngine.FetchOrde
 
 	price_level := value.(*matching.PriceLevel)
 	order := price_level.Get(key)
+	if order == nil {
+		return nil, errors.New("Can't find order in book")
+	}
 
 	return &GrpcEngine.FetchOrderResponse{
 		Order: &GrpcOrder.Order{
