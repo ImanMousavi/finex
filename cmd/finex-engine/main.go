@@ -5,6 +5,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/google/uuid"
 	"github.com/zsmartex/finex/config"
 	"github.com/zsmartex/finex/workers/engines"
 	"github.com/zsmartex/pkg/services"
@@ -33,7 +34,7 @@ func main() {
 
 	ARVG := os.Args[1:]
 	id := ARVG[0]
-	consumer, err := services.NewKafkaConsumer(strings.Split(os.Getenv("KAFKA_URL"), ","), "zsmartex", []string{id})
+	consumer, err := services.NewKafkaConsumer(strings.Split(os.Getenv("KAFKA_URL"), ","), uuid.NewString(), []string{id})
 	if err != nil {
 		panic(err)
 	}

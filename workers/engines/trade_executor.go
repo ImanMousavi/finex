@@ -149,7 +149,6 @@ func (t *TradeExecutor) CreateTradeAndStrikeOrders() (*models.Trade, error) {
 				return result.Error
 			}
 		}
-		config.Logger.Info("3")
 
 		if err := t.VaildateTrade(); err != nil {
 			return err
@@ -171,10 +170,6 @@ func (t *TradeExecutor) CreateTradeAndStrikeOrders() (*models.Trade, error) {
 				CurrencyID: t.TakerOrder.IncomeCurrency().ID,
 			})
 		}
-		config.Logger.Info("5")
-
-		config.Logger.Info("BaseUnit:", market.BaseUnit)
-		config.Logger.Info("QuoteUnit:", market.QuoteUnit)
 
 		tx.Clauses(clause.Locking{
 			Strength: "UPDATE",

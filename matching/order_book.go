@@ -296,82 +296,94 @@ func (ob *OrderBook) Match(order *pkg.Order) {
 		offers = ob.Depth.Asks
 	}
 
-	for {
-		best := offers.Right()
-		if best == nil {
-			break
-		}
+	if offers.Empty() && order.Price.IsZero() {
+		ob.PublishCancel(order.Key())
+		return
+	}
 
-		price_level := best.Value.(*PriceLevel)
+	iter := offers.Iterator()
+	for iter.Next() {
+		price_level := iter.Value().(*PriceLevel)
 		if price_level.Size() == 0 {
 			continue
 		}
 
-		counter_order := price_level.Top()
+		if order.Filled() {
+			break
+		}
 
-		quantity := decimal.Min(order.UnfilledQuantity(), counter_order.UnfilledQuantity())
-
-		if order.Type == pkg.TypeLimit {
-			if !order.IsCrossed(counter_order.Price) {
+		counterIter := price_level.Orders.Iterator()
+		for counterIter.Next() {
+			if order.Filled() {
 				break
 			}
-		}
 
-		order.Fill(quantity)
-		counter_order.Fill(quantity)
+			counter_order := counterIter.Value().(*pkg.Order)
 
-		if counter_order.Filled() || counter_order.Cancelled {
-			ob.Depth.Remove(counter_order.Key())
-		} else {
-			ob.Depth.Add(counter_order)
-		}
-		ob.setMarketPrice(counter_order.Price)
+			quantity := decimal.Min(order.UnfilledQuantity(), counter_order.UnfilledQuantity())
 
-		if counter_order.IsFake() {
-			if _, err := ob.quantexClient.UpdateOrder(&GrpcQuantex.UpdateOrderRequest{
-				Order: &GrpcOrder.Order{
-					Id:       counter_order.ID,
-					Uuid:     counter_order.UUID[:],
-					MemberId: counter_order.MemberID,
-					Symbol:   &GrpcSymbol.Symbol{BaseCurrency: counter_order.Symbol.BaseCurrency, QuoteCurrency: counter_order.Symbol.QuoteCurrency},
-					Side:     string(counter_order.Side),
-					Type:     string(counter_order.Type),
-					Price: &GrpcUtils.Decimal{
-						Val: counter_order.Price.CoefficientInt64(),
-						Exp: counter_order.Price.Exponent(),
-					},
-					StopPrice: &GrpcUtils.Decimal{
-						Val: counter_order.StopPrice.CoefficientInt64(),
-						Exp: counter_order.StopPrice.Exponent(),
-					},
-					Quantity: &GrpcUtils.Decimal{
-						Val: counter_order.Quantity.CoefficientInt64(),
-						Exp: counter_order.Quantity.Exponent(),
-					},
-					FilledQuantity: &GrpcUtils.Decimal{
-						Val: counter_order.FilledQuantity.CoefficientInt64(),
-						Exp: counter_order.FilledQuantity.Exponent(),
-					},
-					Fake:      counter_order.Fake,
-					Cancelled: counter_order.Cancelled,
-					CreatedAt: timestamppb.New(counter_order.CreatedAt),
-				},
-			}); err != nil {
-				config.Logger.Errorf("[orderbook] update order %d failed: %s", counter_order.ID, err)
+			if order.Type == pkg.TypeLimit {
+				if !order.IsCrossed(counter_order.Price) {
+					break
+				}
 			}
-		}
 
-		trade := &pkg.Trade{
-			Symbol:   ob.Symbol,
-			Price:    counter_order.Price,
-			Quantity: quantity,
-			Total:    counter_order.Price.Mul(quantity),
-		}
+			order.Fill(quantity)
+			counter_order.Fill(quantity)
 
-		ob.PublishTrade(order, counter_order, trade)
+			if counter_order.Filled() || counter_order.Cancelled {
+				ob.Depth.Remove(counter_order.Key())
+				counterIter.Prev()
+			}
 
-		if order.Filled() {
-			return
+			if price_level.Total().IsZero() {
+				offers.Remove(price_level.Price)
+			}
+
+			ob.setMarketPrice(counter_order.Price)
+
+			if counter_order.IsFake() {
+				if _, err := ob.quantexClient.UpdateOrder(&GrpcQuantex.UpdateOrderRequest{
+					Order: &GrpcOrder.Order{
+						Id:       counter_order.ID,
+						Uuid:     counter_order.UUID[:],
+						MemberId: counter_order.MemberID,
+						Symbol:   &GrpcSymbol.Symbol{BaseCurrency: counter_order.Symbol.BaseCurrency, QuoteCurrency: counter_order.Symbol.QuoteCurrency},
+						Side:     string(counter_order.Side),
+						Type:     string(counter_order.Type),
+						Price: &GrpcUtils.Decimal{
+							Val: counter_order.Price.CoefficientInt64(),
+							Exp: counter_order.Price.Exponent(),
+						},
+						StopPrice: &GrpcUtils.Decimal{
+							Val: counter_order.StopPrice.CoefficientInt64(),
+							Exp: counter_order.StopPrice.Exponent(),
+						},
+						Quantity: &GrpcUtils.Decimal{
+							Val: counter_order.Quantity.CoefficientInt64(),
+							Exp: counter_order.Quantity.Exponent(),
+						},
+						FilledQuantity: &GrpcUtils.Decimal{
+							Val: counter_order.FilledQuantity.CoefficientInt64(),
+							Exp: counter_order.FilledQuantity.Exponent(),
+						},
+						Fake:      counter_order.Fake,
+						Cancelled: counter_order.Cancelled,
+						CreatedAt: timestamppb.New(counter_order.CreatedAt),
+					},
+				}); err != nil {
+					config.Logger.Errorf("[orderbook] update order %d failed: %s", counter_order.ID, err)
+				}
+			}
+
+			trade := &pkg.Trade{
+				Symbol:   ob.Symbol,
+				Price:    counter_order.Price,
+				Quantity: quantity,
+				Total:    counter_order.Price.Mul(quantity),
+			}
+
+			ob.PublishTrade(order, counter_order, trade)
 		}
 	}
 

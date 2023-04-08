@@ -7,6 +7,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/google/uuid"
 	GrpcEngine "github.com/zsmartex/pkg/Grpc/engine"
 	"github.com/zsmartex/pkg/services"
 	"google.golang.org/grpc"
@@ -24,7 +25,7 @@ func main() {
 	server := engine.NewEngineServer()
 	grpcServer := grpc.NewServer()
 
-	consumer, err := services.NewKafkaConsumer(strings.Split(os.Getenv("KAFKA_URL"), ","), "zsmartex", []string{"matching"})
+	consumer, err := services.NewKafkaConsumer(strings.Split(os.Getenv("KAFKA_URL"), ","), uuid.NewString(), []string{"matching"})
 	if err != nil {
 		panic(err)
 	}
@@ -33,7 +34,6 @@ func main() {
 
 	go func() {
 		for {
-
 			records, err := consumer.Poll()
 			if err != nil {
 				config.Logger.Fatalf("Failed to poll consumer %v", err)
