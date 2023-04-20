@@ -337,7 +337,7 @@ func (ob *OrderBook) Match(order *pkg.Order) {
 			}
 
 			if price_level.Total().IsZero() {
-				offers.Remove(price_level.Price)
+				offers.Remove(price_level.Key())
 			}
 
 			ob.setMarketPrice(counter_order.Price)
