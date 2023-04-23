@@ -196,16 +196,16 @@ func makeComparator(a, b interface{}) int {
 
 	switch {
 	case aPriceLevel.Side == pkg.SideSell && aPriceLevel.Price.LessThan(bPriceLevel.Price):
-		return 1
+		return -1
 
 	case aPriceLevel.Side == pkg.SideSell && aPriceLevel.Price.GreaterThan(bPriceLevel.Price):
-		return -1
+		return 1
 
 	case aPriceLevel.Side == pkg.SideBuy && aPriceLevel.Price.LessThan(bPriceLevel.Price):
-		return -1
+		return 1
 
 	case aPriceLevel.Side == pkg.SideBuy && aPriceLevel.Price.GreaterThan(bPriceLevel.Price):
-		return 1
+		return -1
 
 	default:
 		return 0
